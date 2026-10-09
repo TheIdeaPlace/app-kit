@@ -1,0 +1,24 @@
+name = "appkit-bug-relay"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Secrets (set by the deploy workflow's "sync secrets" option, never committed):
+#   GITHUB_APP_ID       the App's numeric ID
+#   GITHUB_PRIVATE_KEY  the App's private key PEM (PKCS#1 or PKCS#8 both work)
+#   APP_KEYS            JSON object, app id -> relay key, e.g. {"thechatplace":"..."}
+# The installation ID is looked up per repo owner at run time, so it isn't a secret here.
+
+# Per-IP cap on issue creation, shared across all apps. 5/minute is far above any person
+# filing a bug and far below what makes a spam run worthwhile. Counters are shared by every
+# binding with the same namespace_id on the Cloudflare account, even across Workers, so this
+# must differ from QuickMail's old relay (1001). `period` accepts only 10 or 60.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+[observability]
+enabled = true
