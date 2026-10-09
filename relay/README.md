@@ -22,13 +22,14 @@ Nothing runs until a report arrives, so there's no server to patch, monitor or r
    relay tries once more without the labels.
    - If the cached installation or token turns out to be stale, for example after the App was
      reinstalled, it forgets them and tries once more.
-   - Any `@name` in the report gets a zero-width space after the @, so the bot never
-     notifies people. Email addresses are left alone.
+   - Any `@name` in the report gets a zero-width space after the @, so the bot won't notify
+     people mentioned in it. Email addresses are left alone.
 5. It replies with `{issueUrl, number}`. If anything fails, it replies 502 without
    GitHub's error text, and the app falls back to opening a prefilled issue page.
    - All the GitHub calls in one report share a 12-second deadline, which ends before the
-     apps give up at 15. That way the relay can't file a report the person has already filed
-     by hand.
+     apps give up at 15. That makes it unlikely that the relay files a report the person has
+     already filed by hand: it can still happen if GitHub accepts the issue just as the
+     deadline passes.
 
 **Everything in a report is public**, including the optional contact field, which is often
 an email address. The apps must say so next to that field.

@@ -27,5 +27,9 @@ expect reject '[]'
 expect reject '"0123456789abcdef"'
 expect reject 'null'
 expect reject 'not json'
+expect reject '{"quickmial":"0123456789abcdef"}'
+expect reject '{"thechatplace":"0123456789abcdef\n"}'
+expect reject '{"thechatplace":"0123456789abcdef "}'
+expect accept '{"thechatplace":"0123456789abcdef_-XYZ"}'
 
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failure(s)"; exit 1; }

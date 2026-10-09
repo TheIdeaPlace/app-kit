@@ -84,14 +84,16 @@ export default {
       return text(400, 'Malformed JSON.');
     }
 
-    const title = defuseMentions(clip(report?.title, MAX_TITLE_CHARS, ' …'));
-    const body = defuseMentions(clip(report?.body, MAX_FIELD_CHARS, '\n\n…(truncated)'));
+    // Defuse before cutting, so the added characters can't push a title past GitHub's limit.
+    const title = clip(defuseMentions(str(report?.title)), MAX_TITLE_CHARS, ' …');
+    const body = clip(defuseMentions(str(report?.body)), MAX_FIELD_CHARS, '\n\n…(truncated)');
     if (!title || !body) return text(400, 'Both title and body are required.');
 
-    const contact = defuseMentions(clip(report?.contact, MAX_CONTACT_CHARS, ' …'));
+    const contact = clip(defuseMentions(str(report?.contact)), MAX_CONTACT_CHARS, ' …');
     const issueBody = contact ? `${body}\n\n### Contact\n${contact}\n` : body;
 
-    const signal = AbortSignal.timeout(Number(env.DEADLINE_MS) || DEADLINE_MS);
+    // DEADLINE_MS in env exists only so tests can use a short deadline.
+    const signal = AbortSignal.timeout(Math.max(1, Number(env.DEADLINE_MS) || DEADLINE_MS));
     try {
       const issue = await createIssue(env, target, { title, body: issueBody }, signal);
       if (typeof issue?.html_url !== 'string') throw new Error('GitHub reply had no html_url');
@@ -143,7 +145,7 @@ async function postIssue(target, token, fields, signal) {
   try {
     return await githubFetch('POST', url, token, { ...fields, labels: ISSUE_LABELS }, signal);
   } catch (err) {
-    if (STALE_AUTH_ON_ISSUE.has(err.status)) err.staleAuth = true;
+    if (STALE_AUTH_ON_ISSUE.has(err.status) && !err.rateLimited) err.staleAuth = true;
     // 422 means GitHub created nothing; one cause is a label it won't accept. Filing the
     // report without labels beats losing it. A second 422 is reported as a failure.
     if (err.status !== 422) throw err;
@@ -295,9 +297,17 @@ async function githubFetch(method, url, token, jsonBody, signal) {
   if (!response.ok) {
     const err = new Error(`GitHub ${response.status} for ${method} ${url}: ${await response.text()}`);
     err.status = response.status;
+    // GitHub's rate limits also answer 403. Retrying with a fresh token would only add calls
+    // while it's limiting us, so those aren't treated as stale auth.
+    err.rateLimited =
+      response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0';
     throw err;
   }
   return response.json();
+}
+
+function str(value) {
+  return typeof value === 'string' ? value : '';
 }
 
 /** Trims, and cuts to `max` UTF-16 units without splitting a surrogate pair (an emoji). */
@@ -314,11 +324,13 @@ function clip(value, max, suffix) {
 /**
  * Text from the public goes into a public issue filed by the bot, so a "@name" in it would
  * have the bot notify that person. A zero-width space after the @ keeps the text readable
- * but stops GitHub treating it as a mention. An @ inside a word, as in an email address,
- * isn't a mention, so it's left alone.
+ * but stops GitHub treating it as a mention. GitHub sees a mention after any non-word
+ * character (".@name" and "-@name" count), so only an @ right after a letter, digit or
+ * underscore is left alone. That covers email addresses, where a letter or digit always
+ * comes just before the @.
  */
 function defuseMentions(value) {
-  return value.replace(/(?<![\w.+-])@(?=[A-Za-z0-9])/g, '@​');
+  return value.replace(/(?<!\w)@(?=[A-Za-z0-9])/g, '@\u200B');
 }
 
 function byteLength(str) {

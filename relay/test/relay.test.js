@@ -110,6 +110,14 @@ await check('mentions are defused; email addresses are left alone', () => {
   assert.equal(worker.defuseMentions('ping @kellylford please'), 'ping @​kellylford please');
   assert.equal(worker.defuseMentions('@TheIdeaPlace/team'), '@​TheIdeaPlace/team');
   assert.equal(worker.defuseMentions('mail me@example.com'), 'mail me@example.com');
+  assert.equal(worker.defuseMentions('first.last@example.com'), 'first.last@example.com');
+  assert.equal(worker.defuseMentions('_@name'), '_@name');
+  // GitHub treats an @ after any non-word character as a mention, these included.
+  assert.equal(worker.defuseMentions('x.@name'), 'x.@​name');
+  assert.equal(worker.defuseMentions('x-@name'), 'x-@​name');
+  assert.equal(worker.defuseMentions('x+@name'), 'x+@​name');
+  assert.equal(worker.defuseMentions('.@name'), '.@​name');
+  assert.equal(worker.defuseMentions('(@name)'), '(@​name)');
   assert.equal(worker.defuseMentions('a.b+c@example.com'), 'a.b+c@example.com');
   assert.equal(worker.defuseMentions('just an @ sign'), 'just an @ sign');
 });
@@ -136,6 +144,7 @@ function fakeGitHub({
   tokenStatus = 200,
   issueStatus = [201],
   issueReply = (owner, repo) => ({ html_url: `https://github.com/${owner}/${repo}/issues/7`, number: 7 }),
+  issueErrorHeaders = {},
   hang = false,
 } = {}) {
   const calls = [];
@@ -181,7 +190,7 @@ function fakeGitHub({
         return new Response('Bad credentials', { status: 401 });
       }
       const status = statuses.length > 1 ? statuses.shift() : statuses[0];
-      if (status >= 400) return new Response('secret GitHub detail', { status });
+      if (status >= 400) return new Response('secret GitHub detail', { status, headers: issueErrorHeaders });
       return Response.json(issueReply(m[1], m[2]), { status });
     }
     return new Response('unexpected', { status: 500 });
@@ -490,6 +499,39 @@ await check('mentions in the report are defused in the filed issue', async () =>
   const filed = calls.at(-1).body;
   assert.equal(filed.title, 'cc @​someone');
   assert.equal(filed.body, 'ping @​kellylford\n\n### Contact\n@​me or me@example.com\n');
+});
+
+await check('a title full of mentions still fits after defusing', async () => {
+  reset();
+  const { calls } = fakeGitHub();
+  await handler.fetch(report({ body: JSON.stringify({ title: '@x '.repeat(70), body: 'b' }) }), env(), {});
+  assert.ok(calls.at(-1).body.title.length <= 202);
+});
+
+await check('a rate-limited 403 isn\'t retried as stale auth', async () => {
+  for (const headers of [{ 'retry-after': '60' }, { 'x-ratelimit-remaining': '0' }]) {
+    reset();
+    const { calls } = fakeGitHub({ issueStatus: [403], issueErrorHeaders: headers });
+    const res = await quiet(() => handler.fetch(report(), env(), {}));
+    assert.equal(res.status, 502);
+    assert.equal(calls.filter((c) => c.url.endsWith('/issues')).length, 1, JSON.stringify(headers));
+    assert.equal(calls.filter((c) => c.url.endsWith('/access_tokens')).length, 1);
+  }
+});
+
+await check('a plain 403 (repo not covered by the token) is retried once with fresh auth', async () => {
+  reset();
+  const { calls } = fakeGitHub({ issueStatus: [403, 201] });
+  const res = await quiet(() => handler.fetch(report(), env(), {}));
+  assert.equal(res.status, 200);
+  assert.equal(calls.filter((c) => c.url.endsWith('/access_tokens')).length, 2);
+});
+
+await check('a negative DEADLINE_MS still answers cleanly', async () => {
+  reset();
+  fakeGitHub();
+  const res = await quiet(() => handler.fetch(report(), env({ DEADLINE_MS: '-5' }), {}));
+  assert.ok([200, 502].includes(res.status));
 });
 
 await check('a long title is cut without adding new lines', async () => {
