@@ -1,0 +1,71 @@
+name: Relay smoke test
+
+# Files one real test report through the live relay for the chosen app, and checks that a
+# wrong key and another app's key are both refused. Run it from the Actions tab after
+# deploying the relay or adding an app. It runs here because the per-app keys exist only in
+# secrets. Close the test issue it reports.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "App id from APPS in relay/src/index.js"
+        required: true
+        default: thechatplace
+      relay_url:
+        description: "Relay address"
+        required: true
+        default: https://appkit-bug-relay.quickmail.workers.dev
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      APP: ${{ inputs.app }}
+      URL: ${{ inputs.relay_url }}/report
+      APP_KEYS: ${{ secrets.RELAY_APP_KEYS }}
+    steps:
+      - name: File a test report, and check bad keys are refused
+        run: |
+          if ! printf '%s' "$APP" | grep -qE '^[a-z0-9]+$'; then
+            echo "::error::App id must be lower-case letters and digits."
+            exit 1
+          fi
+          key="$(printf '%s' "$APP_KEYS" | jq -r --arg app "$APP" '.[$app] // empty')"
+          if [ -z "$key" ]; then
+            echo "::error::RELAY_APP_KEYS has no key for $APP."
+            exit 1
+          fi
+          echo "::add-mask::$key"
+          other="$(printf '%s' "$APP_KEYS" | jq -r --arg app "$APP" 'to_entries | map(select(.key != $app)) | .[0].value // empty')"
+          [ -n "$other" ] && echo "::add-mask::$other"
+
+          post() {
+            curl -sS -o response.txt -w '%{http_code}' -X POST "$URL" \
+              -H 'Content-Type: application/json' \
+              -H "X-AppKit-App: $APP" -H "X-AppKit-Key: $1" \
+              -d '{"title":"Relay smoke test","body":"Filed by the App Kit relay smoke test. Close me.","kind":"bug"}'
+          }
+
+          status="$(post "wrong-key-0123456789abcdef")"
+          echo "Wrong key: $status"
+          [ "$status" = 401 ] || { echo "::error::A wrong key got $status, not 401."; exit 1; }
+
+          if [ -n "$other" ]; then
+            status="$(post "$other")"
+            echo "Another app's key: $status"
+            [ "$status" = 401 ] || { echo "::error::Another app's key got $status, not 401."; exit 1; }
+          fi
+
+          status="$(post "$key")"
+          echo "Right key: $status"
+          if [ "$status" != 200 ]; then
+            echo "::error::The relay answered $status: $(cat response.txt)"
+            exit 1
+          fi
+          url="$(jq -r .issueUrl response.txt)"
+          echo "Filed $url"
+          echo "### Filed $url" >> "$GITHUB_STEP_SUMMARY"
