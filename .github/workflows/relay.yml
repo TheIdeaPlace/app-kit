@@ -1,0 +1,114 @@
+name: Bug-report relay
+
+# Tests the relay on every PR, and deploys it from main. Deploying runs here rather than on a
+# maintainer's machine because wrangler can't run on Windows ARM64 (workerd has no build for
+# it). Setup and the meaning of each secret are in relay/README.md.
+
+on:
+  pull_request:
+    paths:
+      - 'relay/**'
+      - '.github/workflows/relay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'relay/**'
+      - '.github/workflows/relay.yml'
+  workflow_dispatch:
+    inputs:
+      sync_secrets:
+        description: "Also push the Worker's secrets from repository secrets"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relay-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      # No install step: the tests use only the Node standard library.
+      - name: Test
+        working-directory: relay
+        run: node test/relay.test.js
+      - name: Test the app-keys check
+        working-directory: relay
+        run: bash test/check-app-keys.test.sh
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      # Pinned, because wrangler runs with the Cloudflare token in its environment.
+      WRANGLER_VERSION: 4.149.0
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Until Cloudflare is set up (relay/README.md, step 2), skip instead of failing every
+      # push to main.
+      - name: Check Cloudflare is configured
+        id: configured
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID isn't set, so the relay wasn't deployed. See relay/README.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy Worker
+        if: steps.configured.outputs.ok == 'true'
+        working-directory: relay
+        run: npx --yes wrangler@${{ env.WRANGLER_VERSION }} deploy
+
+      # Opt-in, because a run whose repository secrets are missing would otherwise overwrite
+      # working Worker secrets with empty strings and break bug reporting for every app.
+      - name: Sync Worker secrets
+        if: steps.configured.outputs.ok == 'true' && inputs.sync_secrets
+        working-directory: relay
+        env:
+          APP_ID: ${{ secrets.RELAY_GITHUB_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.RELAY_GITHUB_PRIVATE_KEY }}
+          APP_KEYS: ${{ secrets.RELAY_APP_KEYS }}
+        run: |
+          for name in APP_ID PRIVATE_KEY APP_KEYS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret for $name is empty. Set it before syncing, or the Worker will stop filing reports."
+              exit 1
+            fi
+          done
+          if ! printf '%s' "$APP_KEYS" | bash scripts/check-app-keys.sh; then
+            echo "::error::RELAY_APP_KEYS must be a non-empty JSON object of lower-case app id to key, each key at least 16 characters."
+            exit 1
+          fi
+          if ! printf '%s' "$PRIVATE_KEY" | grep -q 'BEGIN .*PRIVATE KEY'; then
+            echo "::error::RELAY_GITHUB_PRIVATE_KEY doesn't look like a PEM private key."
+            exit 1
+          fi
+
+          # jq --arg keeps the private key's newlines intact. The file lives in the runner's
+          # temp folder, is removed on exit, and never reaches the workspace or the logs.
+          secrets_file="$(mktemp)"
+          trap 'rm -f "$secrets_file"' EXIT
+          jq -n \
+            --arg app_id "$APP_ID" \
+            --arg private_key "$PRIVATE_KEY" \
+            --arg app_keys "$APP_KEYS" \
+            '{GITHUB_APP_ID: $app_id, GITHUB_PRIVATE_KEY: $private_key, APP_KEYS: $app_keys}' \
+            > "$secrets_file"
+          npx --yes wrangler@${{ env.WRANGLER_VERSION }} secret bulk "$secrets_file"

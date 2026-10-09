@@ -1,0 +1,11 @@
+{
+  "name": "appkit-bug-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker that files bug reports for every The Idea Place app, as one GitHub App",
+  "//": "No dependencies on purpose. wrangler can't be installed on Windows ARM64 (workerd has no build for it), so CI runs it with `npx wrangler@4`. The tests use only the Node standard library so they run anywhere.",
+  "scripts": {
+    "test": "node test/relay.test.js"
+  }
+}
