@@ -6,18 +6,22 @@ Before running it, add the app to APPS in src/index.js, merge that, and deploy, 
 knows which repo the app's reports go to.
 
 What it does:
-1. Generates a new key for this app only. Other apps' keys aren't touched, so copies of them
-   already installed keep working.
+1. Generates a new key for this app only. Other apps' keys aren't touched. If the app already
+   has a key, it stops without changing anything, because a new key would cut off every copy
+   already installed. Pass --rotate to replace it anyway.
 2. Stores the key, on stdin so it's never shown:
    - in the Worker, as APP_KEY_<ID> (wrangler secret put);
    - in this repo, as RELAY_APP_KEY_<ID>, so the smoke-test workflow can use it;
    - in the app's repo, as the secret APPKIT_RELAY_KEY, along with the variable APPKIT_RELAY_URL.
 3. Opens the GitHub App's settings in the browser. A person has to add the app's repo
-   there, because GitHub has no API for changing a personal account's installation.
+   there. GitHub's API for this needs a sign-in made through the App itself, and gh's
+   sign-in isn't one.
    Until they do, the app's reports fail with 502.
 4. Prints the command for the smoke test, which proves the whole path works.
 
-Needs: gh signed in with access to the app's repo, and wrangler logged in to Cloudflare.
+Needs: gh signed in with access to the app's repo, and wrangler logged in to Cloudflare. If
+that login can see more than one Cloudflare account, set CLOUDFLARE_ACCOUNT_ID first (it's the
+CLOUDFLARE_ACCOUNT_ID variable in TheIdeaPlace/app-kit).
 """
 
 import argparse
@@ -55,6 +59,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("app", help="the app's id in APPS, lower case, e.g. thechatplace")
     parser.add_argument("--relay-url", default=RELAY_URL)
+    parser.add_argument(
+        "--rotate", action="store_true",
+        help="replace an existing key; installed copies of the app stop reaching the relay until the next release",
+    )
     args = parser.parse_args()
 
     app = args.app
@@ -64,6 +72,17 @@ def main():
     if app not in repos:
         sys.exit(f"{app} isn't in APPS in src/index.js. Add it, merge, deploy, then run this again.")
     repo = repos[app]
+
+    # A new key replaces the one built into every copy of the app already installed, and the
+    # relay prefers APP_KEY_<ID>, so those copies would get 401 until the next release. Only
+    # do that when asked to.
+    has_key = "APPKIT_RELAY_KEY" in run(["gh", "secret", "list", "-R", repo]).split()
+    if has_key and not args.rotate:
+        sys.exit(
+            f"{repo} already has a relay key, so {app} is already connected; nothing was changed.\n"
+            "To replace the key anyway (installed copies stop reaching the relay until the next "
+            "release), run this again with --rotate."
+        )
 
     key = secrets.token_urlsafe(32)
     name = f"APP_KEY_{app.upper()}"

@@ -7,7 +7,8 @@
  *
  * An app identifies itself with two headers:
  *   X-AppKit-App  the app's id, a key of APPS below
- *   X-AppKit-Key  that app's relay key, from the APP_KEYS secret
+ *   X-AppKit-Key  that app's relay key: the Worker secret APP_KEY_<ID>, or its entry in the
+ *                 APP_KEYS secret for the first ten apps
  *
  * Only repos listed in APPS can receive issues, and the app id picks the repo, so a leaked
  * key can file issues in one repo and nowhere else. Keys are per app, so one can be rotated

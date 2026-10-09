@@ -50,15 +50,15 @@ Every step matters. In particular, if step 4 is skipped, the app's reports fail 
 2. **Deploy**, from `relay/` on a PC where wrangler is logged in:
    `npx wrangler@4.149.0 deploy`.
 3. **Give the app a key:** `python scripts/add-app.py <app id>`. The script:
-   - generates a key for this app only;
+   - generates a key for this app only, and stops if the app already has one;
    - stores it in the Worker as `APP_KEY_<ID>`, and in this repo as `RELAY_APP_KEY_<ID>` for the smoke test;
    - puts `APPKIT_RELAY_KEY` and `APPKIT_RELAY_URL` in the app's repo.
 
    No other app's key changes, so copies already installed keep working.
 4. **Add the repo to the GitHub App** (a person has to do this). The script opens the page.
    Choose **Configure** next to *the-idea-place-bug-reporter*, add the repo under
-   **Only select repositories**, then **Save**. GitHub has no API for changing an installation
-   on a personal account, so this can't be scripted.
+   **Only select repositories**, then **Save**. GitHub's API for this needs a sign-in made
+   through the App itself, and gh's sign-in isn't one, so this step can't be scripted.
 5. **Run the smoke test:** `gh workflow run relay-smoke.yml -R TheIdeaPlace/app-kit -f app=<app id>`.
    It files one real report and checks that bad keys are refused. Close the test issue it files.
 
@@ -125,7 +125,12 @@ variables → Actions), never into chat. From then on, every merge to `main` tha
 
 The workflow's **sync secrets** option pushes `RELAY_GITHUB_APP_ID`,
 `RELAY_GITHUB_PRIVATE_KEY` and `RELAY_APP_KEYS` back into the Worker. It needs the API token
-above. It doesn't push `APP_KEY_<ID>`; run `add-app.py` again for those.
+above. It leaves the `APP_KEY_<ID>` secrets alone.
+
+**Don't replace an app's key casually.** The key is built into every copy of the app
+already installed, so a new one cuts them all off until the next release. `add-app.py`
+refuses to replace a key unless it's given `--rotate`. Use that only when a key has to change,
+for example because it was abused, and release the app soon after.
 
 ## QuickMail's old relay
 
