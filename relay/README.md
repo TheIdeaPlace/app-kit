@@ -10,7 +10,8 @@ Nothing runs until a report arrives, so there's no server to patch, monitor or r
 
 ## How a report travels
 
-1. The app POSTs to `https://<worker>/report` with JSON `{title, body, contact?}` and two headers:
+1. The app POSTs to `https://<worker>/report` with JSON `{title, body, contact?, kind?}` and two headers.
+   `kind` is `"bug"` (the default) or `"suggestion"`. The headers are:
    - `X-AppKit-App`: the app's id, for example `thechatplace`
    - `X-AppKit-Key`: that app's relay key
 2. The Worker checks the key against that app's entry in `APP_KEYS`. It refuses an unknown
@@ -18,7 +19,8 @@ Nothing runs until a report arrives, so there's no server to patch, monitor or r
 3. It looks up the GitHub App's installation for the repo's owner and gets a one-hour token
    for that installation.
 4. It files the issue in the repo listed for that app in `APPS` (`src/index.js`), with the
-   labels `bug` and `user-reported`. If GitHub refuses with 422, nothing was created, so the
+   labels `bug` and `user-reported`, or `enhancement` and `user-reported` for a suggestion.
+   If GitHub refuses with 422, nothing was created, so the
    relay tries once more without the labels.
    - If the cached installation or token turns out to be stale, for example after the App was
      reinstalled, it forgets them and tries once more.

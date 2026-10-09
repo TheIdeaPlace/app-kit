@@ -248,6 +248,20 @@ await check('files the issue in the sending app\'s own repo, as the App', async 
   assert.deepEqual(issue.body, { title: 'It broke', body: 'What happened: it broke.', labels: ['bug', 'user-reported'] });
 });
 
+await check('a suggestion is labelled enhancement; anything else is a bug', async () => {
+  for (const [kind, expected] of [
+    ['suggestion', ['enhancement', 'user-reported']],
+    ['bug', ['bug', 'user-reported']],
+    [undefined, ['bug', 'user-reported']],
+    ['something-else', ['bug', 'user-reported']],
+  ]) {
+    reset();
+    const { calls } = fakeGitHub();
+    await handler.fetch(report({ body: JSON.stringify({ title: 't', body: 'b', kind }) }), env(), {});
+    assert.deepEqual(calls.at(-1).body.labels, expected, String(kind));
+  }
+});
+
 await check('app id is matched without regard to case', async () => {
   reset();
   fakeGitHub();

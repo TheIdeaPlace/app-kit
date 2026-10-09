@@ -34,7 +34,13 @@ const APPS = {
 };
 
 const USER_AGENT = 'TheIdeaPlace-AppKit-Relay';
-const ISSUE_LABELS = ['bug', 'user-reported'];
+// The report's `kind` picks the labels. Without this, ideas sent from an app's Report a Bug
+// arrived labelled bug and had to be relabelled by hand (AIChat#131, #134). Anything other
+// than "suggestion" is a bug, so older apps that don't send a kind keep working.
+const LABELS_FOR_KIND = {
+  bug: ['bug', 'user-reported'],
+  suggestion: ['enhancement', 'user-reported'],
+};
 
 // The apps give up after 15s and fall back to a prefilled issue page. If the relay were still
 // working after that, the person could file by hand and the relay could file the same report
@@ -95,7 +101,8 @@ export default {
     // DEADLINE_MS in env exists only so tests can use a short deadline.
     const signal = AbortSignal.timeout(Math.max(1, Number(env.DEADLINE_MS) || DEADLINE_MS));
     try {
-      const issue = await createIssue(env, target, { title, body: issueBody }, signal);
+      const labels = report?.kind === 'suggestion' ? LABELS_FOR_KIND.suggestion : LABELS_FOR_KIND.bug;
+      const issue = await createIssue(env, target, { title, body: issueBody }, labels, signal);
       if (typeof issue?.html_url !== 'string') throw new Error('GitHub reply had no html_url');
       return Response.json({ issueUrl: issue.html_url, number: issue.number });
     } catch (err) {
@@ -124,11 +131,11 @@ function appKey(env, appId) {
  * reinstalled, or the repo was added to it after the token was made), forget them and try
  * once more. That's safe: GitHub refuses those before creating anything.
  */
-async function createIssue(env, target, fields, signal) {
+async function createIssue(env, target, fields, labels, signal) {
   for (let attempt = 1; ; attempt++) {
     try {
       const token = await getInstallationToken(env, target, signal);
-      return await postIssue(target, token, fields, signal);
+      return await postIssue(target, token, fields, labels, signal);
     } catch (err) {
       if (attempt === 1 && err.staleAuth) {
         console.error(`stale GitHub auth for ${target.owner}, retrying with a fresh lookup:`, err);
@@ -140,10 +147,10 @@ async function createIssue(env, target, fields, signal) {
   }
 }
 
-async function postIssue(target, token, fields, signal) {
+async function postIssue(target, token, fields, labels, signal) {
   const url = `https://api.github.com/repos/${target.owner}/${target.repo}/issues`;
   try {
-    return await githubFetch('POST', url, token, { ...fields, labels: ISSUE_LABELS }, signal);
+    return await githubFetch('POST', url, token, { ...fields, labels }, signal);
   } catch (err) {
     if (STALE_AUTH_ON_ISSUE.has(err.status) && !err.rateLimited) err.staleAuth = true;
     // 422 means GitHub created nothing; one cause is a label it won't accept. Filing the

@@ -11,5 +11,5 @@ here="$(cd "$(dirname "$0")" && pwd)"
 allowed="$(node "$here/app-ids.mjs")" || exit 1
 
 jq -e --argjson allowed "$allowed" 'type == "object" and length > 0
-       and (keys | all(test("^[a-z0-9]+$") and (. as $id | $allowed | any(. == $id))))
-       and (to_entries | all(.value | type == "string" and test("^[A-Za-z0-9_-]{16,}$")))' > /dev/null
+       and (keys | all(test("\\A[a-z0-9]+\\z") and (. as $id | $allowed | any(. == $id))))
+       and (to_entries | all(.value | type == "string" and test("\\A[A-Za-z0-9_-]{16,}\\z")))' > /dev/null
