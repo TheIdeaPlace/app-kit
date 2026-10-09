@@ -296,6 +296,30 @@ for (const [name, opts] of [
   });
 }
 
+await check('an app\'s own APP_KEY_<ID> secret works without APP_KEYS', async () => {
+  reset();
+  fakeGitHub();
+  const res = await handler.fetch(report({ key: 'own-key-0123456789' }), env({ APP_KEYS: undefined, APP_KEY_THECHATPLACE: 'own-key-0123456789' }), {});
+  assert.equal(res.status, 200);
+});
+
+await check('an app\'s own key takes over from its APP_KEYS entry', async () => {
+  reset();
+  fakeGitHub();
+  const e = env({ APP_KEY_THECHATPLACE: 'own-key-0123456789' });
+  assert.equal((await handler.fetch(report(), e, {})).status, 401, 'the old key must stop working');
+  assert.equal((await handler.fetch(report({ key: 'own-key-0123456789' }), e, {})).status, 200);
+});
+
+await check('one app\'s own key opens no other app', async () => {
+  reset();
+  const { calls } = fakeGitHub();
+  const e = env({ APP_KEY_GHMANAGE: 'gh-key-0123456789' });
+  const res = await handler.fetch(report({ app: 'thechatplace', key: 'gh-key-0123456789' }), e, {});
+  assert.equal(res.status, 401);
+  assert.equal(calls.length, 0);
+});
+
 await check('a missing APP_KEYS secret refuses everything', async () => {
   reset();
   fakeGitHub();

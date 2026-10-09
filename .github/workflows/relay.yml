@@ -1,8 +1,8 @@
 name: Bug-report relay
 
-# Tests the relay on every PR, and deploys it from main. Deploying runs here rather than on a
-# maintainer's machine because wrangler can't run on Windows ARM64 (workerd has no build for
-# it). Setup and the meaning of each secret are in relay/README.md.
+# Tests the relay on every PR, and deploys it from main once CLOUDFLARE_API_TOKEN is set.
+# Until then, deploy from a PC with `npx wrangler@4.149.0 deploy` (it runs on Windows ARM64).
+# Setup and the meaning of each secret are in relay/README.md.
 
 on:
   pull_request:

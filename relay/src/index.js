@@ -7,7 +7,8 @@
  *
  * An app identifies itself with two headers:
  *   X-AppKit-App  the app's id, a key of APPS below
- *   X-AppKit-Key  that app's relay key, from the APP_KEYS secret
+ *   X-AppKit-Key  that app's relay key: the Worker secret APP_KEY_<ID>, or its entry in the
+ *                 APP_KEYS secret for the first ten apps
  *
  * Only repos listed in APPS can receive issues, and the app id picks the repo, so a leaked
  * key can file issues in one repo and nowhere else. Keys are per app, so one can be rotated
@@ -114,8 +115,16 @@ export default {
   },
 };
 
-/** APP_KEYS is a JSON object of app id to key. A missing or malformed secret fails closed. */
+/**
+ * An app's key is its own secret, APP_KEY_<ID> (for example APP_KEY_THECHATPLACE). That lets
+ * scripts/add-app.py add an app without touching, or knowing, any other app's key.
+ *
+ * The first ten apps were set up with one JSON secret, APP_KEYS (app id -> key). It's still
+ * read for any app without its own secret. A missing or malformed value fails closed.
+ */
 function appKey(env, appId) {
+  const own = env[`APP_KEY_${appId.toUpperCase()}`];
+  if (typeof own === 'string' && own) return own;
   try {
     const keys = JSON.parse(env.APP_KEYS || '{}');
     const key = keys?.[appId];

@@ -14,7 +14,8 @@ Nothing runs until a report arrives, so there's no server to patch, monitor or r
    `kind` is `"bug"` (the default) or `"suggestion"`. The headers are:
    - `X-AppKit-App`: the app's id, for example `thechatplace`
    - `X-AppKit-Key`: that app's relay key
-2. The Worker checks the key against that app's entry in `APP_KEYS`. It refuses an unknown
+2. The Worker checks the key against that app's own secret, `APP_KEY_<ID>`, or its entry in
+   `APP_KEYS` for the first ten apps. It refuses an unknown
    app or a wrong key with 401. Each address is limited to 5 reports a minute.
 3. It looks up the GitHub App's installation for the repo's owner and gets a one-hour token
    for that installation.
@@ -42,15 +43,30 @@ any other app.
 
 ## Adding an app
 
-1. Add a line to `APPS` in `src/index.js`, then open a PR. The tests check the entry.
-2. Install the GitHub App on that repo (step 1 below).
-3. Give the app a key:
-   - Add it to the `RELAY_APP_KEYS` repo secret here, then run the workflow with
-     **sync secrets** on.
-   - Set the same key in the app repo's `BUG_REPORT_RELAY_KEY` secret, so its builds include it.
+Every step matters. In particular, if step 4 is skipped, the app's reports fail with 502.
 
-When a repo moves to another owner (for example into TheIdeaPlace), change its `APPS`
-line. The Worker finds the new owner's installation by itself.
+1. **Add the app to `APPS`** in `src/index.js`: one line with its id and repo. Then open a PR;
+   the tests check the entry.
+2. **Deploy**, from `relay/` on a PC where wrangler is logged in:
+   `npx wrangler@4.149.0 deploy`.
+3. **Give the app a key:** `python scripts/add-app.py <app id>`. The script:
+   - generates a key for this app only, and stops if the app already has one;
+   - stores it in the Worker as `APP_KEY_<ID>`, and in this repo as `RELAY_APP_KEY_<ID>` for the smoke test;
+   - puts `APPKIT_RELAY_KEY` and `APPKIT_RELAY_URL` in the app's repo.
+
+   No other app's key changes, so copies already installed keep working.
+4. **Add the repo to the GitHub App** (a person has to do this). The script opens the page.
+   Choose **Configure** next to *the-idea-place-bug-reporter*, add the repo under
+   **Only select repositories**, then **Save**. GitHub's API for this needs a sign-in made
+   through the App itself, and gh's sign-in isn't one, so this step can't be scripted.
+5. **Run the smoke test:** `gh workflow run relay-smoke.yml -R TheIdeaPlace/app-kit -f app=<app id>`.
+   It files one real report and checks that bad keys are refused. Close the test issue it files.
+
+**When a repo moves to another owner,** for example into TheIdeaPlace:
+- change its `APPS` line and deploy;
+- install the App on the new owner, if it isn't already, and add the repo there.
+
+The Worker finds the new owner's installation by itself. The repo's secrets move with it.
 
 ## Tests
 
@@ -63,85 +79,58 @@ node relay/test/relay.test.js
 `relay/test/check-app-keys.test.sh` tests the check on `RELAY_APP_KEYS`. It needs jq, so it
 runs in CI.
 
-The **Bug-report relay** workflow runs them on every PR and deploys from `main`.
+The **Bug-report relay** workflow runs both on every PR. It deploys from `main` only once a
+Cloudflare API token is set (see below). Until then, deploy from a PC.
 
-## One-time setup
+## How it's set up (done 2026-10-09)
 
-Deploying runs in CI, because wrangler can't run on Windows ARM64. The deploy step skips,
-with a notice, until steps 2 and 3 are done.
+- **Worker:** `appkit-bug-relay` on Kelly's Cloudflare account (the one QuickMail's relay uses),
+  at `https://appkit-bug-relay.quickmail.workers.dev`.
+  - The `quickmail` subdomain belongs to the account and can't be changed. People never see
+    the address, because it's built into the apps.
+  - The rate limit's `namespace_id` (1002) differs from the old relay's (1001), so the two
+    don't share counters.
+- **Deploying from this PC works.** wrangler 4.149.0 runs on Windows ARM64. That corrects
+  QuickMail's older note. `npx wrangler@4.149.0 login` signs in through the browser.
+  - The sign-in waits only about two minutes after the Allow page opens.
+  - It runs a small listener on this PC to catch the answer, so it has to keep running
+    until Allow is pressed.
+- **GitHub App:** *The Idea Place Bug Reporter*, App ID 5251631, owned by TheIdeaPlace, set
+  to be installable on any account so it can go on kellylford's repos.
+  - Its only permission is to read and write issues. It has no webhook.
+  - It was created with `scripts/setup-github-app.py`, which uses GitHub's app-manifest flow: a
+    person only presses **Create**, and the private key goes straight into secrets, never
+    shown to anyone.
+- **Secrets:**
+  - In the Worker: `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `APP_KEYS` (the first ten apps),
+    and `APP_KEY_<ID>` for apps added later.
+  - In this repo: `RELAY_GITHUB_APP_ID`, `RELAY_GITHUB_PRIVATE_KEY`, `RELAY_APP_KEYS` and
+    `RELAY_APP_KEY_<ID>`, plus the variable `CLOUDFLARE_ACCOUNT_ID`.
+  - In each app's repo: `APPKIT_RELAY_KEY` and the variable `APPKIT_RELAY_URL`.
+- **Device flow is off.** It's for the planned "file under my own name" sign-in
+  (TheIdeaPlace/app-kit#2). Turn it on in the App's settings when that's built.
 
-### 1. Create the GitHub App (Kelly, in the browser)
+### Optional: let CI deploy
 
-At <https://github.com/organizations/TheIdeaPlace/settings/apps/new>:
+Create a Cloudflare API token at <https://dash.cloudflare.com/profile/api-tokens>, choosing
+**Create Custom Token**:
+- two permissions, `Account / Workers Scripts / Edit` and `Account / Account Settings / Read`;
+- scoped to your account, with no zone.
 
-- **Name:** `The Idea Place Bug Reporter`. Issues show `the-idea-place-bug-reporter[bot]` as the author.
-- **Homepage URL:** `https://github.com/TheIdeaPlace/app-kit`
-- **Enable Device Flow:** on. Nothing uses it yet. It's for the planned option to sign in from
-  inside an app and file under your own name (TheIdeaPlace/app-kit#2). Whether this App's
-  user tokens can file in these repos still has to be checked when that's built.
-- **Webhook:** uncheck **Active**.
-- **Repository permissions → Issues:** **Read and write**. Leave everything else at **No access**.
-- **Where can this App be installed:** **Any account**. Today's app repos belong to
-  kellylford, not the org, and only an App installable on any account can be installed
-  there. It does no harm if a stranger installs it, because the relay only files in repos
-  listed in `APPS`.
+Paste it straight into this repo's `CLOUDFLARE_API_TOKEN` secret (Settings → Secrets and
+variables → Actions), never into chat. From then on, every merge to `main` that touches
+`relay/` deploys by itself.
 
-Then:
+### Redoing the secrets
 
-- Note the **App ID**, and the **Client ID** for sign-in later. The client ID isn't secret.
-- Generate a **private key**. GitHub downloads a `.pem` file once and won't show it again.
-- **Install App** on **kellylford**, choosing **Only select repositories**, and pick every repo in `APPS`.
-  Install it on **TheIdeaPlace** too, for repos that move there.
+The workflow's **sync secrets** option pushes `RELAY_GITHUB_APP_ID`,
+`RELAY_GITHUB_PRIVATE_KEY` and `RELAY_APP_KEYS` back into the Worker. It needs the API token
+above. It leaves the `APP_KEY_<ID>` secrets alone.
 
-### 2. Cloudflare
-
-You can reuse the account that runs QuickMail's relay.
-
-- **The workers.dev subdomain is per account, and permanent.** If the QuickMail account is
-  reused, the relay's address becomes `appkit-bug-relay.quickmail.workers.dev`. To get
-  `theideaplace` in the address instead, use a new Cloudflare account. On a new account, open
-  **Workers & Pages** once and choose a subdomain before the first deploy, or the deploy fails.
-- The rate limit's `namespace_id` (1002) is different from the old relay's (1001), so the two
-  don't share counters on one account.
-
-- At <https://dash.cloudflare.com/profile/api-tokens>, choose **Create Custom Token**.
-- Give it two permissions:
-  - `Account / Workers Scripts / Edit`
-  - `Account / Account Settings / Read`
-- Scope it to your account. No zone is needed.
-
-### 3. Secrets in this repo
-
-Settings → Secrets and variables → Actions:
-
-| Name | Kind | Value |
-|---|---|---|
-| `CLOUDFLARE_API_TOKEN` | secret | the token from step 2 |
-| `CLOUDFLARE_ACCOUNT_ID` | variable | the account ID from the Cloudflare dashboard |
-| `RELAY_GITHUB_APP_ID` | secret | the App ID |
-| `RELAY_GITHUB_PRIVATE_KEY` | secret | the full contents of the `.pem` file |
-| `RELAY_APP_KEYS` | secret | `{"thechatplace":"<random>", ...}`, one random key of at least 16 characters per app |
-
-Paste the private key straight from the file into the GitHub secret form. Never put it in
-chat or in a file in a repo. Claude can generate the app keys and set `RELAY_APP_KEYS` and each app's
-`BUG_REPORT_RELAY_KEY` with `gh secret set`, so no key passes through a person's hands.
-
-Then run **Bug-report relay** from the Actions tab with **sync secrets** on. The Worker URL
-is in the deploy log, as `https://appkit-bug-relay.<subdomain>.workers.dev`. Set it as the
-`BUG_REPORT_RELAY_URL` variable in each app repo.
-
-### 4. Smoke test
-
-File one real report, then close the issue it creates. Take the key from wherever it was
-generated; don't paste it into chat.
-
-```bash
-curl -sS -X POST "https://appkit-bug-relay.<subdomain>.workers.dev/report"   -H "Content-Type: application/json"   -H "X-AppKit-App: thechatplace"   -H "X-AppKit-Key: $THECHATPLACE_RELAY_KEY"   -d '{"title":"Relay smoke test","body":"Testing the shared relay. Close me."}'
-```
-
-Expect `{"issueUrl":"https://github.com/kellylford/AIChat/issues/…","number":…}`, with the
-issue authored by `the-idea-place-bug-reporter[bot]`. The same request with a wrong key, or
-with `X-AppKit-App: quickmail`, must return 401 and file nothing.
+**Don't replace an app's key casually.** The key is built into every copy of the app
+already installed, so a new one cuts them all off until the next release. `add-app.py`
+refuses to replace a key unless it's given `--rotate`. Use that only when a key has to change,
+for example because it was abused, and release the app soon after.
 
 ## QuickMail's old relay
 
