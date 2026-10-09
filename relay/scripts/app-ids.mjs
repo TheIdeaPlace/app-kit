@@ -1,4 +1,6 @@
-// Prints the app ids in APPS (src/index.js) as a JSON array, for check-app-keys.sh.
+// Prints the apps in APPS (src/index.js) as JSON.
+//   node app-ids.mjs           ["quickmail", ...]                         (for check-app-keys.sh)
+//   node app-ids.mjs --repos   {"quickmail": "kellylford/QuickMail", ...} (for setup-github-app.py)
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -9,9 +11,13 @@ if (!block) {
   console.error('Could not find APPS in src/index.js');
   process.exit(1);
 }
-const ids = [...block[1].matchAll(/^\s+([a-z0-9]+): \{/gm)].map((m) => m[1]);
-if (ids.length === 0) {
+const entries = [...block[1].matchAll(/^\s+([a-z0-9]+): \{ owner: '([^']+)', repo: '([^']+)' \}/gm)];
+if (entries.length === 0) {
   console.error('APPS in src/index.js has no entries');
   process.exit(1);
 }
-console.log(JSON.stringify(ids));
+if (process.argv.includes('--repos')) {
+  console.log(JSON.stringify(Object.fromEntries(entries.map(([, id, owner, repo]) => [id, `${owner}/${repo}`]))));
+} else {
+  console.log(JSON.stringify(entries.map(([, id]) => id)));
+}
