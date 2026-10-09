@@ -147,8 +147,8 @@ async function createIssue(env, target, fields, labels, signal) {
       return await postIssue(target, token, fields, labels, signal);
     } catch (err) {
       if (attempt === 1 && err.staleAuth) {
-        console.error(`stale GitHub auth for ${target.owner}, retrying with a fresh lookup:`, err);
-        forget(target.owner);
+        console.error(`stale GitHub auth for ${repoKey(target)}, retrying with a fresh lookup:`, err);
+        forget(target);
         continue;
       }
       throw err;
@@ -179,12 +179,21 @@ const STALE_AUTH_ON_TOKEN = new Set([401, 404]);
 // The App is installed once per account (kellylford, and later TheIdeaPlace), and each
 // installation has its own id and its own one-hour tokens. Both are cached per isolate: a
 // warm instance skips two round-trips, and a cold one looks them up again.
-const installationIds = new Map(); // owner -> installation id
+//
+// The installation is cached per repo, not per owner. When a repo moves to TheIdeaPlace,
+// GitHub redirects its old name, so looking up "kellylford/X" returns the org's installation.
+// Caching that under "kellylford" would send every other kellylford app to the wrong
+// installation.
+const installationIds = new Map(); // "owner/repo" (lower case) -> installation id
 const tokens = new Map(); // installation id -> { token, expiresAt }
 
-function forget(owner) {
-  const installationId = installationIds.get(owner);
-  installationIds.delete(owner);
+function repoKey(target) {
+  return `${target.owner}/${target.repo}`.toLowerCase();
+}
+
+function forget(target) {
+  const installationId = installationIds.get(repoKey(target));
+  installationIds.delete(repoKey(target));
   if (installationId !== undefined) tokens.delete(installationId);
 }
 
@@ -192,7 +201,7 @@ async function getInstallationToken(env, target, signal) {
   let jwt;
   const appJwt = async () => (jwt ??= await createAppJwt(env.GITHUB_APP_ID, env.GITHUB_PRIVATE_KEY));
 
-  let installationId = installationIds.get(target.owner);
+  let installationId = installationIds.get(repoKey(target));
   if (installationId === undefined) {
     const installation = await githubFetch(
       'GET',
@@ -202,7 +211,7 @@ async function getInstallationToken(env, target, signal) {
       signal,
     );
     installationId = installation.id;
-    installationIds.set(target.owner, installationId);
+    installationIds.set(repoKey(target), installationId);
   }
 
   const cached = tokens.get(installationId);

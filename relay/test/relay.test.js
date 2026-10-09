@@ -398,6 +398,34 @@ await check('a GitHub failure is 502 and leaks none of GitHub\'s reply', async (
   assert.doesNotMatch(await res.text(), /secret GitHub detail/);
 });
 
+await check('a repo that moved to the org doesn\'t send other kellylford apps to the org\'s installation', async () => {
+  reset();
+  // HyperVManage has moved: GitHub redirects kellylford/HyperVManage, so its lookup returns
+  // the org's installation (99). Every other kellylford repo is still on installation 42.
+  const posts = [];
+  globalThis.fetch = async (url, init) => {
+    let m;
+    if ((m = url.match(/\/repos\/([^/]+)\/([^/]+)\/installation$/))) {
+      return Response.json({ id: m[2] === 'HyperVManage' ? 99 : 42 });
+    }
+    if ((m = url.match(/\/app\/installations\/(\d+)\/access_tokens$/))) {
+      return Response.json({ token: `inst-token-${m[1]}`, expires_at: new Date(Date.now() + 3600_000).toISOString() });
+    }
+    if ((m = url.match(/\/repos\/([^/]+)\/([^/]+)\/issues$/))) {
+      const expected = m[2] === 'HyperVManage' ? 'Bearer inst-token-99' : 'Bearer inst-token-42';
+      posts.push({ repo: m[2], ok: init.headers.Authorization === expected });
+      if (init.headers.Authorization !== expected) return new Response('Not Found', { status: 404 });
+      return Response.json({ html_url: `https://github.com/${m[1]}/${m[2]}/issues/1`, number: 1 }, { status: 201 });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const keys = JSON.stringify({ hypervmanage: 'hv-key-0123456789', thechatplace: KEYS.thechatplace });
+  const e = env({ APP_KEYS: keys });
+  assert.equal((await handler.fetch(report({ app: 'hypervmanage', key: 'hv-key-0123456789' }), e, {})).status, 200);
+  assert.equal((await handler.fetch(report(), e, {})).status, 200);
+  assert.deepEqual(posts, [{ repo: 'HyperVManage', ok: true }, { repo: 'AIChat', ok: true }], 'no request used the wrong installation');
+});
+
 await check('a second report reuses the installation id and token', async () => {
   reset();
   const { calls } = fakeGitHub();
@@ -437,7 +465,7 @@ await check('a reinstalled App (new installation id) heals on the very next repo
     const res = await quiet(() => handler.fetch(report(), env(), {}));
     assert.equal(res.status, 200, `report ${i + 1} after the reinstall`);
   }
-  assert.equal(worker.installationIds.get('kellylford'), 43);
+  assert.equal(worker.installationIds.get('kellylford/aichat'), 43);
 });
 
 await check('a stale id with an expired token heals too', async () => {
