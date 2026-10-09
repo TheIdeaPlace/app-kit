@@ -27,6 +27,9 @@ jobs:
       APP: ${{ inputs.app }}
       URL: ${{ inputs.relay_url }}/report
       APP_KEYS: ${{ secrets.RELAY_APP_KEYS }}
+      # Apps added by scripts/add-app.py have their own secret; the first ten are in APP_KEYS.
+      # Secret names aren't case-sensitive, so the lower-case id finds RELAY_APP_KEY_<ID>.
+      OWN_KEY: ${{ secrets[format('RELAY_APP_KEY_{0}', inputs.app)] }}
     steps:
       - name: File a test report, and check bad keys are refused
         run: |
@@ -34,9 +37,10 @@ jobs:
             echo "::error::App id must be lower-case letters and digits."
             exit 1
           fi
-          key="$(printf '%s' "$APP_KEYS" | jq -r --arg app "$APP" '.[$app] // empty')"
+          key="$OWN_KEY"
+          [ -z "$key" ] && key="$(printf '%s' "$APP_KEYS" | jq -r --arg app "$APP" '.[$app] // empty')"
           if [ -z "$key" ]; then
-            echo "::error::RELAY_APP_KEYS has no key for $APP."
+            echo "::error::There's no RELAY_APP_KEY_$APP secret, and RELAY_APP_KEYS has no key for $APP."
             exit 1
           fi
           echo "::add-mask::$key"
