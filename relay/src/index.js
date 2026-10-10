@@ -23,7 +23,7 @@
  */
 const APPS = {
   quickmail: { owner: 'kellylford', repo: 'QuickMail' },
-  hypervmanage: { owner: 'kellylford', repo: 'HyperVManage' },
+  hypervmanage: { owner: 'TheIdeaPlace', repo: 'HyperVManage' },
   rssquick: { owner: 'kellylford', repo: 'rssquick' },
   livecaptions: { owner: 'kellylford', repo: 'LiveCaptionsWithAccessibility' },
   thechatplace: { owner: 'kellylford', repo: 'AIChat' },
