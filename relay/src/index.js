@@ -27,10 +27,10 @@ const APPS = {
   rssquick: { owner: 'TheIdeaPlace', repo: 'rssquick' },
   livecaptions: { owner: 'TheIdeaPlace', repo: 'LiveCaptionsWithAccessibility' },
   thechatplace: { owner: 'kellylford', repo: 'AIChat' },
-  ghmanage: { owner: 'kellylford', repo: 'GHManage' },
+  ghmanage: { owner: 'TheIdeaPlace', repo: 'GHManage' },
   theclaudehub: { owner: 'kellylford', repo: 'TheWorkBench' },
-  idt: { owner: 'kellylford', repo: 'Image-Description-Toolkit' },
-  weatherfast: { owner: 'kellylford', repo: 'WeatherFast' },
+  idt: { owner: 'TheIdeaPlace', repo: 'Image-Description-Toolkit' },
+  weatherfast: { owner: 'TheIdeaPlace', repo: 'WeatherFast' },
   scores: { owner: 'TheIdeaPlace', repo: 'Scores' },
 };
 
