@@ -28,7 +28,7 @@ const APPS = {
   livecaptions: { owner: 'TheIdeaPlace', repo: 'LiveCaptionsWithAccessibility' },
   thechatplace: { owner: 'TheIdeaPlace', repo: 'AIChat' },
   ghmanage: { owner: 'TheIdeaPlace', repo: 'GHManage' },
-  theclaudehub: { owner: 'kellylford', repo: 'TheWorkBench' },
+  theclaudehub: { owner: 'TheIdeaPlace', repo: 'TheWorkBench' },
   idt: { owner: 'TheIdeaPlace', repo: 'Image-Description-Toolkit' },
   weatherfast: { owner: 'TheIdeaPlace', repo: 'WeatherFast' },
   scores: { owner: 'TheIdeaPlace', repo: 'Scores' },
