@@ -26,7 +26,7 @@ const APPS = {
   hypervmanage: { owner: 'TheIdeaPlace', repo: 'HyperVManage' },
   rssquick: { owner: 'TheIdeaPlace', repo: 'rssquick' },
   livecaptions: { owner: 'TheIdeaPlace', repo: 'LiveCaptionsWithAccessibility' },
-  thechatplace: { owner: 'kellylford', repo: 'AIChat' },
+  thechatplace: { owner: 'TheIdeaPlace', repo: 'AIChat' },
   ghmanage: { owner: 'TheIdeaPlace', repo: 'GHManage' },
   theclaudehub: { owner: 'kellylford', repo: 'TheWorkBench' },
   idt: { owner: 'TheIdeaPlace', repo: 'Image-Description-Toolkit' },
