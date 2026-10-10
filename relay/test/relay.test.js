@@ -131,6 +131,12 @@ await check('every app maps to an owner and repo', () => {
 
 // ---------------------------------------------------------------- fake GitHub
 
+// The handler tests below describe fixed situations ("thechatplace lives at kellylford/AIChat,
+// installation 42"), not the live APPS list, which changes as repos move into TheIdeaPlace.
+// Pin the two entries they use so a move doesn't break them.
+worker.APPS.thechatplace = { owner: 'kellylford', repo: 'AIChat' };
+worker.APPS.quickmail = { owner: 'kellylford', repo: 'QuickMail' };
+
 const KEYS = { thechatplace: 'tcp-key-123', quickmail: 'qm-key-456' };
 
 /**
