@@ -24,14 +24,14 @@
 const APPS = {
   quickmail: { owner: 'kellylford', repo: 'QuickMail' },
   hypervmanage: { owner: 'TheIdeaPlace', repo: 'HyperVManage' },
-  rssquick: { owner: 'kellylford', repo: 'rssquick' },
-  livecaptions: { owner: 'kellylford', repo: 'LiveCaptionsWithAccessibility' },
+  rssquick: { owner: 'TheIdeaPlace', repo: 'rssquick' },
+  livecaptions: { owner: 'TheIdeaPlace', repo: 'LiveCaptionsWithAccessibility' },
   thechatplace: { owner: 'kellylford', repo: 'AIChat' },
   ghmanage: { owner: 'kellylford', repo: 'GHManage' },
   theclaudehub: { owner: 'kellylford', repo: 'TheWorkBench' },
   idt: { owner: 'kellylford', repo: 'Image-Description-Toolkit' },
   weatherfast: { owner: 'kellylford', repo: 'WeatherFast' },
-  scores: { owner: 'kellylford', repo: 'Scores' },
+  scores: { owner: 'TheIdeaPlace', repo: 'Scores' },
 };
 
 const USER_AGENT = 'TheIdeaPlace-AppKit-Relay';
