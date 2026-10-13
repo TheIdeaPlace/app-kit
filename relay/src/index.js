@@ -32,7 +32,7 @@ const APPS = {
   idt: { owner: 'TheIdeaPlace', repo: 'Image-Description-Toolkit' },
   weatherfast: { owner: 'TheIdeaPlace', repo: 'WeatherFast' },
   scores: { owner: 'TheIdeaPlace', repo: 'Scores' },
-  photofinder: { owner: 'kellylford', repo: 'PhotoFinder' },
+  photofinder: { owner: 'TheIdeaPlace', repo: 'MyPhotoLibraryDescribed' },
 };
 
 const USER_AGENT = 'TheIdeaPlace-AppKit-Relay';
