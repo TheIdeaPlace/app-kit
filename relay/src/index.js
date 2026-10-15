@@ -33,6 +33,7 @@ const APPS = {
   weatherfast: { owner: 'TheIdeaPlace', repo: 'WeatherFast' },
   scores: { owner: 'TheIdeaPlace', repo: 'Scores' },
   photofinder: { owner: 'TheIdeaPlace', repo: 'MyPhotoLibraryDescribed' },
+  quickdescribe: { owner: 'TheIdeaPlace', repo: 'QuickDescribe' },
 };
 
 const USER_AGENT = 'TheIdeaPlace-AppKit-Relay';
