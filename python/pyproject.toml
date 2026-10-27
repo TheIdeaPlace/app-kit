@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "theideaplace-appkit"
+version = "0.1.0"
+description = "Shared pieces for The Idea Place's wxPython apps."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = []
+
+[tool.setuptools]
+packages = ["theideaplace_appkit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
