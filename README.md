@@ -9,13 +9,13 @@ The plan and the decisions behind it are in
 
 ## What's in it
 
-Nothing yet. This is what's planned.
+`relay/` is in use, and `python/` has started. The rest is planned.
 
 | Folder | What | Used by |
 |---|---|---|
 | `relay/` | One bug-report relay, a Cloudflare Worker, for every app. It holds one GitHub App key and files each report in the right app's repo, from a list of allowed repos and with a key per app. Replaces the separate relays in QuickMail and Hyper-V Manage. | Every app |
 | `dotnet/` | `TheIdeaPlace.AppKit`, a NuGet package: updates through Velopack, Report a Bug (with optional GitHub sign-in), crash handling and the log file, About, and the Beta setting. | QuickMail, Hyper-V Manage, RSS Quick, Live Captions |
-| `python/` | `theideaplace-appkit`, a Python package with the same features, for wxPython apps. | The Chat Place, GHManage, TheClaudeHub, IDT, WeatherFast, Scores |
+| `python/` | `theideaplace-appkit`, a Python package with the same features, for wxPython apps. It has started with `difftext`, which turns a diff into lines to read with a screen reader (see `python/README.md`). | The Chat Place, GHManage, TheClaudeHub, IDT, WeatherFast, Scores |
 | `.github/workflows/` | Shared release workflows: build, sign with Azure Artifact Signing, `vpk pack`, check every signature, publish. Each app's own release workflow calls these. | Every Windows and Mac app |
 
 ## How every app behaves
