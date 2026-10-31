@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # Versions of the actions used in .github/workflows/*.yml.
+  #
+  # Grouped deliberately: a runtime-wide move like the Node 20 -> 24
+  # migration touches every action at once, and ungrouped that arrives as
+  # one PR per action. As a single PR it is one review and one merge, and
+  # the workflows never sit half-migrated between merges.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # relay/package.json, the bug-report Worker. It has no dependencies on
+  # purpose (wrangler is run pinned through npx, and the tests use only the
+  # Node standard library), so today this finds nothing. It is here so that
+  # anything added later is watched from the day it lands, grouped into one
+  # PR like everything else.
+  - package-ecosystem: npm
+    directory: "/relay"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      relay:
+        patterns:
+          - "*"
+
+  # python/pyproject.toml, the shared package the wxPython apps pin by commit.
+  # It has no runtime dependencies yet; only the build backend (setuptools)
+  # can move. Grouped so a future dependency arrives as one PR, and the apps
+  # pick up the change only when they move their pinned commit.
+  - package-ecosystem: pip
+    directory: "/python"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      python:
+        patterns:
+          - "*"
