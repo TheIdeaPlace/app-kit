@@ -28,7 +28,7 @@ Names say what happened, not which app it happened in. Each app maps its own eve
 | `sent` | Something went out | Two notes, rising | Message sent |
 | `queued` | Saved to go out later | One note, repeated softer | Message queued |
 | `failed` | Something important didn't happen | Three notes, falling | Send failed |
-| `error` | A smaller action failed | Two low notes, repeated | Delete, move or archive failed |
+| `error` | A smaller action failed | Two low notes, repeated | Delete, move, archive or empty trash failed |
 | `arrived` | Something new came in | Three notes, rising | New mail |
 | `attention` | Something you asked to watch | Repeated note, then a higher one | Watched conversation |
 | `connected` | Back online | Two low notes, rising | Connection restored |
