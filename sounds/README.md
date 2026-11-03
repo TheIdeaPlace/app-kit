@@ -35,6 +35,7 @@ Names say what happened, not which app it happened in. Each app maps its own eve
 | `disconnected` | Went offline | Two low notes, falling | Connection lost |
 | `reminder` | Time for something | One high note, three times | Calendar reminder |
 | `removed` | Something was deleted | Two quick low notes, falling | Message deleted |
+| `emptied` | Everything in a place was deleted | Three quick notes, falling | Trash emptied |
 | `filed` | Something was put away | Two quick notes, a small step up | Message archived |
 | `moved` | Something was moved | Two quick notes, a bigger step up | Message moved |
 | `matched` | A rule of yours fired | One bright note | Default for a rule |
