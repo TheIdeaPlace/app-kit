@@ -26,6 +26,10 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
         python: ['3.9', '3.12']
+        exclude:
+          # Ubuntu 26.04 has no Python 3.9. Linux apps use the distribution's newer one.
+          - os: ubuntu-latest
+            python: '3.9'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
