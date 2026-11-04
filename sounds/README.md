@@ -91,7 +91,7 @@ These come from building and measuring QuickMail's sounds. Apply them unless you
 
 **Don't sound twice**
 
-- A Windows toast plays its own sound unless it's marked silent, so silence it when your sound plays (measured). A tray balloon does the same, and wx's `ShowBalloon` can't ask for `NIIF_NOSOUND`.
+- A Windows toast or tray balloon plays its own sound unless it's marked silent (measured), so your sound can be a second one. Offer a setting to leave it out, off to start: what Windows does for someone's notifications is theirs to change. wx's `ShowBalloon` can't ask for `NIIF_NOSOUND`.
 - If two things can sound for one item, record which item was sounded rather than relying on a timer.
 
 **Stay quiet at the right times**
