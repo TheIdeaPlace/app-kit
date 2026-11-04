@@ -105,6 +105,7 @@ These come from building and measuring QuickMail's sounds. Apply them unless you
 - Never let an audio problem reach the caller or delay real work. Play on a background thread, and treat no audio device as normal.
 - Open the device per sound, so it follows the default device and doesn't hold it awake.
 - In Python on Windows, don't use `winsound` or `wx.adv.Sound`: `PlaySound` held a 40 ms clip for about 500 ms and can't be cut off from another thread (measured). `waveOut` through ctypes took about 75 ms and stops at once.
+- Cutting a sound off and closing the device straight away can put a faint click out afterwards, about one time in seven with `waveOut` (measured). Holding the device open for 100 ms stopped it.
 - A player may report it has stopped while audio is still in its buffer. With NAudio 3.3 this lost about 50 ms from every sound; 200 ms of trailing silence fixed it.
 - Limit the length of any file you didn't make when you open it, not only when it's chosen, since settings files and hand-copied files skip the chooser.
 - Refuse file names that are Windows device names, such as `COM1.wav`, and store only a bare file name, never a path.

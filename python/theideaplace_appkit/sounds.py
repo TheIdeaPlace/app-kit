@@ -38,6 +38,10 @@ MAX_BYTES = 5 * 1024 * 1024
 #: Silence after each sound played through waveOut, which reports a buffer done while its end is
 #: still on the way to the speakers, so closing at that point would clip it.
 LEAD_OUT_SECONDS = 0.1
+#: How long the device stays open after a sound is cut off. Closed at once, about one in seven cuts
+#: put a faint click out afterwards; held this long, none in 50 (measured through a virtual sound
+#: card, with nothing else playing).
+CUT_OFF_HOLD_SECONDS = 0.1
 #: How long a person's long sound may keep something urgent waiting. Every built-in sound is over by
 #: then, so this only ever cuts off a file of their own.
 URGENT_WAIT_SECONDS = 1.5
@@ -401,6 +405,8 @@ class WaveOutOutput:
                     # Reset also returns the buffer, which Unprepare insists on.
                     self._winmm.waveOutReset(device)
                     self._winmm.waveOutUnprepareHeader(device, c.byref(header), size)
+                    if cancel.is_set():
+                        time.sleep(CUT_OFF_HOLD_SECONDS)
             finally:
                 self._winmm.waveOutClose(device)
         finally:
