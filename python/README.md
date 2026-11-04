@@ -27,7 +27,7 @@ be tested on its own and used from any app.
 Pin a tag or a commit of main in the app's `requirements.txt`:
 
 ```
-theideaplace-appkit @ git+https://github.com/TheIdeaPlace/app-kit@python-v0.1.0#subdirectory=python
+theideaplace-appkit @ git+https://github.com/TheIdeaPlace/app-kit@python-v0.2.0#subdirectory=python
 ```
 
 Import it at the top of a module the app always imports, so PyInstaller bundles it without a

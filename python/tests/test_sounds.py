@@ -195,6 +195,48 @@ def test_urgent_cuts_off_a_long_sound_after_a_moment(monkeypatch):
     player.close()
 
 
+def test_urgent_cuts_off_a_long_urgent_sound_too(monkeypatch):
+    monkeypatch.setattr(sounds, "URGENT_WAIT_SECONDS", 0.05)
+    output = FakeOutput(hold=True)
+    player = SoundPlayer(output)
+    player.play("my long alert", priority=URGENT)
+    assert output.started.wait(2)
+    player.play("failed", priority=URGENT)
+    end = time.monotonic() + 2
+    while not output.cancelled and time.monotonic() < end:
+        time.sleep(0.002)
+    assert output.cancelled == ["my long alert"]
+    output.release.set()
+    settle(player)
+    player.close()
+
+
+def test_a_full_queue_of_alerts_keeps_a_preview():
+    output = FakeOutput()
+    player = SoundPlayer(output)
+    with player._lock:
+        player._queue.append(sounds._Item("p", "p", NORMAL, 1.0, None, True))
+        for name in "abcd":
+            player._add_urgent(sounds._Item(name, name, URGENT, 1.0, None, False))
+        assert [i.path for i in player._queue] == ["a", "b", "c", "d", "p"]
+    player.close()
+
+
+def test_no_thread_for_the_wait_cuts_off_at_once_rather_than_raising(monkeypatch):
+    output = FakeOutput(hold=True)
+    player = SoundPlayer(output)
+    player.play("long")
+    assert output.started.wait(2)
+
+    def refuse(self):
+        raise RuntimeError("can't start new thread")
+    monkeypatch.setattr(threading.Timer, "start", refuse)
+    assert player.play("attention", priority=URGENT) is True
+    output.release.set()
+    settle(player)
+    player.close()
+
+
 def test_preview_leaves_an_alert_waiting():
     output = FakeOutput(hold=True)
     player = SoundPlayer(output)
@@ -222,7 +264,7 @@ def test_no_thread_to_be_had_never_reaches_the_caller(monkeypatch):
         raise RuntimeError("can't start new thread")
     monkeypatch.setattr(threading.Thread, "start", refuse)
     player = SoundPlayer(FakeOutput())
-    assert player.play("a") in (True, False)
+    assert player.play("a") is False
     assert not player.busy
     player.preview("b")
     assert not player.busy
@@ -369,6 +411,15 @@ def test_read_wav_refuses_what_it_cannot_play(tmp_path, build):
         sounds.read_wav(build(tmp_path / "x.wav"))
 
 
+def test_read_wav_says_what_is_wrong_with_a_rate_of_zero(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    data = bytearray(Path(path).read_bytes())
+    data[24:28] = struct.pack("<I", 0)
+    Path(path).write_bytes(data)
+    with pytest.raises(SoundProblem):
+        sounds.read_wav(path)
+
+
 def test_read_wav_refuses_an_absurd_sample_rate(tmp_path):
     path = make_wav(tmp_path / "x.wav")
     data = bytearray(Path(path).read_bytes())
@@ -501,7 +552,30 @@ def test_linux_passes_over_a_player_whose_server_is_not_there(tmp_path):
     output = linux(popen, "pw-play", "paplay")
     output.play(path, 1.0, threading.Event())
     output.play(path, 1.0, threading.Event())
-    assert calls == ["pw-play", "paplay", "paplay"]
+    assert calls == ["pw-play", "paplay", "paplay"]  # what works goes first from then on
+
+
+def test_linux_gives_no_player_up_for_good(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    broken = {"pw-play", "paplay"}
+    calls = []
+
+    def popen(command, **kwargs):
+        calls.append(command[0])
+        return FakeProcess(code=1 if command[0] in broken else 0)
+    output = linux(popen, "pw-play", "paplay", "aplay")
+    output.play(path, 1.0, threading.Event())
+    broken.update({"aplay"})
+    broken.discard("pw-play")  # a sound server back after a restart
+    output.play(path, 1.0, threading.Event())
+    assert calls[-1] == "pw-play"
+
+
+def test_aplay_at_full_volume_needs_no_copy(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    popen, calls = recording()
+    linux(popen, "aplay").play(path, 1.0, threading.Event())
+    assert calls == [["aplay", "-q", path]]
 
 
 def test_linux_says_so_when_the_last_player_fails(tmp_path):

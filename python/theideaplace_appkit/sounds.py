@@ -80,7 +80,7 @@ def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, byt
             raise SoundProblem(f"It's larger than {MAX_BYTES // (1024 * 1024)} MB.")
         with wave.open(str(path), "rb") as reader:
             params = reader.getparams()
-            if params.sampwidth != 2 or params.nchannels not in (1, 2) or params.framerate <= 0:
+            if params.sampwidth != 2 or params.nchannels not in (1, 2):
                 raise SoundProblem("It has to be a 16-bit WAV file, mono or stereo.")
             if not _RATES[0] <= params.framerate <= _RATES[1]:
                 raise SoundProblem("Its sample rate isn't one that can be played.")
@@ -182,8 +182,7 @@ class SoundPlayer:
                 self._add_urgent(item)
             else:
                 self._queue.append(item)
-            self._wake()
-        return True
+            return self._wake()
 
     def _add_urgent(self, item: _Item) -> None:
         """Ahead of anything that isn't urgent, and behind what's urgent already, so what must be
@@ -192,20 +191,25 @@ class SoundPlayer:
         kept = [i for i in self._queue if i.priority != AMBIENT]
         urgent = sum(1 for i in kept if i.priority == URGENT)
         kept.insert(urgent, item)
-        while len(kept) > max(self.policy.max_waiting, urgent + 1):
-            kept.pop()
+        # From the end, never a preview: someone is waiting to hear that.
+        for index in range(len(kept) - 1, urgent, -1):
+            if len(kept) > self.policy.max_waiting and not kept[index].preview:
+                kept.pop(index)
         self._queue = collections.deque(kept)
         current = self._current
-        if current is None or current.priority == URGENT:
+        if current is None:
             return
         if current.priority == AMBIENT:
             current.cancel.set()
-        else:
-            # Built-in sounds finish first. A person's own 25-second file doesn't get to make an
-            # alert 25 seconds late. Setting this on a sound that has ended does nothing.
-            timer = threading.Timer(URGENT_WAIT_SECONDS, current.cancel.set)
-            timer.daemon = True
+            return
+        # Built-in sounds finish first. A person's own 25-second file, for any event, doesn't get
+        # to make an alert 25 seconds late. Setting this on a sound that has ended does nothing.
+        timer = threading.Timer(URGENT_WAIT_SECONDS, current.cancel.set)
+        timer.daemon = True
+        try:
             timer.start()
+        except RuntimeError:
+            current.cancel.set()  # no thread to wait with, so the alert doesn't wait
 
     def preview(self, path: str, *, volume: float = 1.0, fallback: Optional[str] = None) -> None:
         """Play a sound someone asked to hear, now: it ends what's playing unless that's urgent,
@@ -256,7 +260,7 @@ class SoundPlayer:
         if self._current is not None:
             self._current.cancel.set()
 
-    def _wake(self) -> None:
+    def _wake(self) -> bool:
         if self._thread is None:
             thread = threading.Thread(target=self._run, name="sounds", daemon=True)
             try:
@@ -265,9 +269,10 @@ class SoundPlayer:
                 # The interpreter is shutting down, or no thread can be had. Nothing can play.
                 self._queue.clear()
                 _log.warning("Couldn't start the sound thread: %s", exc)
-                return
+                return False
             self._thread = thread
         self._lock.notify_all()
+        return True
 
     def _run(self) -> None:
         while True:
@@ -312,6 +317,7 @@ class WaveOutOutput:
     _MAPPER = 0xFFFFFFFF
     _EVENT = 0x50000  # CALLBACK_EVENT
     _DONE = 1  # WHDR_DONE
+    _CACHE_BYTES = 16 * 1024 * 1024
 
     def __init__(self) -> None:
         import ctypes
@@ -350,6 +356,8 @@ class WaveOutOutput:
         self._kernel.WaitForSingleObject.restype = w.DWORD
         self._kernel.CloseHandle.argtypes = [w.HANDLE]
         self._cache: "collections.OrderedDict[tuple, tuple]" = collections.OrderedDict()
+        #: Buffers a driver wouldn't give back. Kept for good: it may still write to them.
+        self._stuck: list = []
 
     def _load(self, path: str, volume: float):
         stat = os.stat(path)
@@ -361,7 +369,9 @@ class WaveOutOutput:
         silence = int(params.framerate * LEAD_OUT_SECONDS) * params.nchannels * 2
         loaded = (params, scaled(frames, volume) + bytes(silence))
         self._cache[key] = loaded
-        while len(self._cache) > 32:  # 15 or so sounds, at the odd volume change
+        # Plenty for every built-in sound. One long file of someone's own doesn't stay at many volumes.
+        while (len(self._cache) > 1
+               and sum(len(entry[1]) for entry in self._cache.values()) > self._CACHE_BYTES):
             self._cache.popitem(last=False)
         return loaded
 
@@ -381,6 +391,7 @@ class WaveOutOutput:
             if result:
                 raise SoundProblem(f"No sound device (waveOutOpen {result}).")
             try:
+                hung = False
                 buffer = c.create_string_buffer(data, len(data))
                 header = self._Header()
                 header.lpData = c.cast(buffer, c.c_void_p)
@@ -398,17 +409,23 @@ class WaveOutOutput:
                     # hold the queue for good.
                     deadline = time.monotonic() + seconds + 5
                     while not header.dwFlags & self._DONE:
-                        if cancel.is_set() or time.monotonic() > deadline:
+                        if cancel.is_set():
+                            break
+                        if time.monotonic() > deadline:
+                            hung = True
                             break
                         self._kernel.WaitForSingleObject(event, 20)
                 finally:
                     # Reset also returns the buffer, which Unprepare insists on.
                     self._winmm.waveOutReset(device)
-                    self._winmm.waveOutUnprepareHeader(device, c.byref(header), size)
+                    if self._winmm.waveOutUnprepareHeader(device, c.byref(header), size):
+                        self._stuck.append((buffer, header))
                     if cancel.is_set():
                         time.sleep(CUT_OFF_HOLD_SECONDS)
             finally:
                 self._winmm.waveOutClose(device)
+            if hung:
+                raise SoundProblem("The sound device didn't finish the sound.")
         finally:
             self._kernel.CloseHandle(event)
 
@@ -474,15 +491,19 @@ class LinuxOutput(_CommandOutput):
         seconds = self._check(path)
         volume = max(0.0, min(1.0, volume))
         # Having a player doesn't mean its sound server is running: pipewire-bin can be installed
-        # on a PulseAudio desktop. One that fails is passed over from then on, unless it's the last.
-        while True:
+        # on a PulseAudio desktop. So each is tried in turn, and whichever works goes first from
+        # then on. None is dropped for good: a sound server restarting, or one odd file, shouldn't
+        # cost a player for the rest of the session.
+        for command in list(self._commands):
             try:
-                self._play_with(self._commands[0], path, volume, cancel, seconds)
-                return
+                self._play_with(command, path, volume, cancel, seconds)
             except (SoundProblem, OSError):
-                if len(self._commands) == 1 or cancel.is_set():
+                if cancel.is_set() or command == self._commands[-1]:
                     raise
-                self._commands.pop(0)
+                continue
+            self._commands.remove(command)
+            self._commands.insert(0, command)
+            return
 
     def _play_with(self, command: str, path: str, volume: float, cancel: threading.Event,
                    seconds: float) -> None:
@@ -495,7 +516,10 @@ class LinuxOutput(_CommandOutput):
             self._aplay(path, volume, cancel, seconds)
 
     def _aplay(self, path: str, volume: float, cancel: threading.Event, seconds: float) -> None:
-        # aplay has no volume, so it gets a scaled copy.
+        # aplay has no volume, so it gets a scaled copy, unless nothing needs scaling.
+        if volume >= 1.0:
+            self._run(["aplay", "-q", path], cancel, seconds)
+            return
         params, frames = read_wav(path)
         handle, copy = tempfile.mkstemp(suffix=".wav", prefix="sound-")
         os.close(handle)
