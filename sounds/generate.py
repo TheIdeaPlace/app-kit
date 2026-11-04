@@ -4,7 +4,8 @@
 Usage: generate.py <output folder>
 
 Writes <output>/<style>/<name>.wav for every style and sound name: 44.1 kHz, 16-bit, mono,
-under one second, peak-normalized so the sounds sit at an even level. Same input, same bytes.
+under one second, peak-normalized so the sounds sit at an even level, apart from the few that
+are meant to sit under everything else (SOFT). Same input, same bytes.
 
 Names say what happened rather than which app it happened in, so any app can map its own
 events to them. Each name has one melodic shape across all styles; a style only changes the
@@ -31,6 +32,8 @@ C5, D5, E5, G5, A5 = 72, 74, 76, 79, 81
 C6, E6 = 84, 88
 A3, C3 = 57, 48
 
+DEFAULT_TAIL = 0.35
+
 # (note, start seconds, gain). The shape of each sound; styles only change the timbre.
 SOUNDS = {
     "sent": [(G5, 0.00, 0.8), (C6, 0.09, 1.0)],
@@ -47,7 +50,28 @@ SOUNDS = {
     "filed": [(C5, 0.00, 0.9), (D5, 0.07, 0.9)],
     "moved": [(D5, 0.00, 0.9), (G5, 0.07, 1.0)],
     "matched": [(E6, 0.00, 1.0)],
+    "tap": [(A4, 0.00, 1.0)],
+    "changed": [(A4, 0.00, 0.8), (E5, 0.06, 1.0)],
+    "pulse": [(C4, 0.00, 1.0)],
+    "elsewhere": [(C4, 0.00, 0.8), (E4, 0.10, 0.85), (G4, 0.20, 1.0)],
+    "stopped": [(C4, 0.00, 1.0)],
 }
+
+# Sounds that happen often, or about something you aren't looking at, so they sit under speech
+# rather than at the level of the rest. tail is how long the last note rings, so a tap is over
+# quickly. Everything else uses PEAK and DEFAULT_TAIL.
+SOFT = {
+    "tap": {"peak": 0.18, "tail": 0.07},
+    "changed": {"peak": 0.22, "tail": 0.07},
+    "pulse": {"peak": 0.12, "tail": 0.12},
+    "elsewhere": {"peak": 0.32},
+    "stopped": {"peak": 0.40, "tail": 0.18},
+}
+
+
+def peak_of(name):
+    """The level a sound is normalized to, which measure.py checks."""
+    return SOFT.get(name, {}).get("peak", PEAK)
 
 
 def bell(freq, seconds):
@@ -92,9 +116,8 @@ def wood(freq, seconds):
 STYLES = {"glass": glass, "softbell": bell, "wood": wood}
 
 
-def render(shape, voice):
+def render(shape, voice, peak_level=PEAK, tail=DEFAULT_TAIL):
     """Mix a sound's notes, fade the tail, normalize, and return 16-bit samples."""
-    tail = 0.35
     length = min(MAX_SECONDS, max(start for _, start, _ in shape) + tail)
     mix = [0.0] * int(length * RATE)
     for note, start, gain in shape:
@@ -106,7 +129,7 @@ def render(shape, voice):
     for i in range(fade):
         mix[len(mix) - 1 - i] *= i / fade
     peak = max(abs(v) for v in mix)
-    return [int(round(v / peak * PEAK * 32767)) for v in mix]
+    return [int(round(v / peak * peak_level * 32767)) for v in mix]
 
 
 def main():
@@ -117,7 +140,8 @@ def main():
         folder = root / style
         folder.mkdir(parents=True, exist_ok=True)
         for name, shape in SOUNDS.items():
-            samples = render(shape, voice)
+            soft = SOFT.get(name, {})
+            samples = render(shape, voice, peak_of(name), soft.get("tail", DEFAULT_TAIL))
             with wave.open(str(folder / f"{name}.wav"), "wb") as w:
                 w.setnchannels(1)
                 w.setsampwidth(2)

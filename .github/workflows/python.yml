@@ -6,11 +6,13 @@ on:
   pull_request:
     paths:
       - 'python/**'
+      - 'sounds/**'
       - '.github/workflows/python.yml'
   push:
     branches: [main]
     paths:
       - 'python/**'
+      - 'sounds/**'
       - '.github/workflows/python.yml'
   workflow_dispatch:
 
@@ -22,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
         python: ['3.9', '3.12']
     runs-on: ${{ matrix.os }}
     steps:
@@ -35,3 +37,11 @@ jobs:
       - name: Test
         working-directory: python
         run: python -W error -m pytest -q tests
+      - name: The sounds are as generated, with no clicks
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        working-directory: sounds
+        run: |
+          python generate.py .
+          git diff --exit-code -- '*.wav'
+          test -z "$(git status --porcelain -- '*.wav')"
+          python measure.py .

@@ -14,6 +14,14 @@ be tested on its own and used from any app.
   GitHub's `files[].patch`; not combined (`@@@`) or coloured diffs, so run git with
   `--no-color`. Used by The Chat Place's Changed Files (TheIdeaPlace/AIChat#174).
 
+- `sounds`: short sounds from `sounds/` at the top of this repo, played one at a time with the
+  flood rules in that folder's README. `SoundPlayer.play` returns at once, takes a priority
+  (`AMBIENT`, `NORMAL` or `URGENT`), and no audio problem reaches the caller. `stop` is for Mute,
+  and `preview` and `stop_preview` are for a settings screen. Windows uses `waveOut`, macOS
+  `afplay`, and Linux `pw-play`, `paplay` or `aplay`, so it adds no dependency. Also here:
+  `read_wav`, which checks a person's own file, `safe_file_name`, and `quiet_now`, for
+  presentations and full-screen programs. Used by The Chat Place (TheIdeaPlace/AIChat#250).
+
 ## Using it
 
 Pin a tag or a commit of main in the app's `requirements.txt`:
