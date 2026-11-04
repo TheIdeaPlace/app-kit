@@ -38,10 +38,17 @@ MAX_BYTES = 5 * 1024 * 1024
 #: Silence after each sound played through waveOut, which reports a buffer done while its end is
 #: still on the way to the speakers, so closing at that point would clip it.
 LEAD_OUT_SECONDS = 0.1
+#: How long a person's long sound may keep something urgent waiting. Every built-in sound is over by
+#: then, so this only ever cuts off a file of their own.
+URGENT_WAIT_SECONDS = 1.5
+#: A sample rate outside this isn't a real recording, and a tiny file claiming one could otherwise
+#: make the lead-out a huge allocation.
+_RATES = (8000, 192000)
 
 _DEVICE_NAMES = {"con", "prn", "aux", "nul", "conin$", "conout$"}
-_DEVICE_NAMES.update(f"com{i}" for i in range(10))
-_DEVICE_NAMES.update(f"lpt{i}" for i in range(10))
+# With the superscript digits Windows also reserves, as Python's own ntpath.isreserved has them.
+for _digit in "0123456789\u00b9\u00b2\u00b3":
+    _DEVICE_NAMES.update((f"com{_digit}", f"lpt{_digit}"))
 
 _log = logging.getLogger(__name__)
 
@@ -59,7 +66,7 @@ def safe_file_name(name: str) -> bool:
         return False
     if name != name.rstrip(" ."):
         return False  # Windows would quietly open a different name
-    return name.split(".", 1)[0].lower() not in _DEVICE_NAMES
+    return name.split(".", 1)[0].rstrip(" ").lower() not in _DEVICE_NAMES
 
 
 def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, bytes]:
@@ -71,6 +78,8 @@ def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, byt
             params = reader.getparams()
             if params.sampwidth != 2 or params.nchannels not in (1, 2) or params.framerate <= 0:
                 raise SoundProblem("It has to be a 16-bit WAV file, mono or stereo.")
+            if not _RATES[0] <= params.framerate <= _RATES[1]:
+                raise SoundProblem("Its sample rate isn't one that can be played.")
             if params.nframes / params.framerate > limit_seconds:
                 raise SoundProblem(f"It's longer than {limit_seconds:g} seconds.")
             frames = reader.readframes(params.nframes)
@@ -78,6 +87,8 @@ def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, byt
         raise
     except (OSError, EOFError, wave.Error, ValueError) as exc:
         raise SoundProblem(f"It can't be read as a WAV file ({exc}).") from exc
+    # A file cut off partway through a frame: the device takes whole frames only.
+    frames = frames[: len(frames) // (2 * params.nchannels) * (2 * params.nchannels)]
     if not frames:
         raise SoundProblem("It has no sound in it.")
     return params, frames
@@ -164,25 +175,48 @@ class SoundPlayer:
                     item.key, priority, self._current is not None, len(self._queue)):
                 return False
             if priority == URGENT:
-                self._queue.appendleft(item)
-                while len(self._queue) > self.policy.max_waiting:
-                    self._queue.pop()
-                if self._current is not None and self._current.priority == AMBIENT:
-                    self._current.cancel.set()
+                self._add_urgent(item)
             else:
                 self._queue.append(item)
             self._wake()
         return True
 
-    def preview(self, path: str, *, volume: float = 1.0) -> None:
-        """Play a sound someone asked to hear, now: it ends whatever is playing, and nothing that
-        applies to ``play`` applies to it."""
-        item = _Item(str(path), str(path), NORMAL, volume, None, True)
+    def _add_urgent(self, item: _Item) -> None:
+        """Ahead of anything that isn't urgent, and behind what's urgent already, so what must be
+        heard is heard in order. A tap waiting now says nothing later, and something else gives
+        way if the queue is over its limit. Never another urgent sound: this one was promised."""
+        kept = [i for i in self._queue if i.priority != AMBIENT]
+        urgent = sum(1 for i in kept if i.priority == URGENT)
+        kept.insert(urgent, item)
+        while len(kept) > max(self.policy.max_waiting, urgent + 1):
+            kept.pop()
+        self._queue = collections.deque(kept)
+        current = self._current
+        if current is None or current.priority == URGENT:
+            return
+        if current.priority == AMBIENT:
+            current.cancel.set()
+        else:
+            # Built-in sounds finish first. A person's own 25-second file doesn't get to make an
+            # alert 25 seconds late. Setting this on a sound that has ended does nothing.
+            timer = threading.Timer(URGENT_WAIT_SECONDS, current.cancel.set)
+            timer.daemon = True
+            timer.start()
+
+    def preview(self, path: str, *, volume: float = 1.0, fallback: Optional[str] = None) -> None:
+        """Play a sound someone asked to hear, now: it ends what's playing unless that's urgent,
+        and an earlier preview, and nothing that applies to ``play`` applies to it. Sounds waiting
+        stay waiting: an alert isn't lost because someone was choosing a sound. ``fallback`` as in
+        ``play``, so a preview is what would really be heard."""
+        item = _Item(str(path), str(path), NORMAL, volume, fallback, True)
         with self._lock:
             if self._closed:
                 return
-            self._cancel_all()
-            self._queue.append(item)
+            self._queue = collections.deque(i for i in self._queue if not i.preview)
+            if self._current is not None and self._current.priority != URGENT:
+                self._current.cancel.set()
+            urgent = sum(1 for i in self._queue if i.priority == URGENT)
+            self._queue.insert(urgent, item)
             self._wake()
 
     def stop(self) -> None:
@@ -220,8 +254,15 @@ class SoundPlayer:
 
     def _wake(self) -> None:
         if self._thread is None:
-            self._thread = threading.Thread(target=self._run, name="sounds", daemon=True)
-            self._thread.start()
+            thread = threading.Thread(target=self._run, name="sounds", daemon=True)
+            try:
+                thread.start()
+            except RuntimeError as exc:
+                # The interpreter is shutting down, or no thread can be had. Nothing can play.
+                self._queue.clear()
+                _log.warning("Couldn't start the sound thread: %s", exc)
+                return
+            self._thread = thread
         self._lock.notify_all()
 
     def _run(self) -> None:
@@ -373,25 +414,32 @@ class _CommandOutput:
         self._popen = popen
         self._checked: Dict[tuple, bool] = {}
 
-    def _check(self, path: str) -> None:
+    def _check(self, path: str) -> float:
+        """That the file can be played, and how long it lasts."""
         stat = os.stat(path)
         key = (path, stat.st_mtime_ns, stat.st_size)
         if key not in self._checked:
-            read_wav(path)
-            self._checked[key] = True
+            params, _frames = read_wav(path)
+            self._checked[key] = params.nframes / params.framerate
+        return self._checked[key]
 
-    def _run(self, command, cancel: threading.Event) -> None:
+    def _run(self, command, cancel: threading.Event, seconds: float) -> None:
+        """``seconds`` is the sound's length: a player still going well after that has hung, as one
+        waiting for a sound server that isn't there does, and mustn't hold the queue."""
         process = self._popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
-        deadline = time.monotonic() + MAX_SECONDS + 10
+        deadline = time.monotonic() + seconds + 5
         while process.poll() is None:
-            if cancel.is_set() or time.monotonic() > deadline:
+            hung = time.monotonic() > deadline
+            if cancel.is_set() or hung:
                 process.terminate()
                 try:
                     process.wait(1)
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
+                if hung:
+                    raise SoundProblem(f"{command[0]} didn't finish.")
                 return
             time.sleep(0.01)
         if process.returncode:
@@ -402,8 +450,9 @@ class AfplayOutput(_CommandOutput):
     """macOS's afplay: on every Mac, and it follows the default device."""
 
     def play(self, path: str, volume: float, cancel: threading.Event) -> None:
-        self._check(path)
-        self._run(["/usr/bin/afplay", "-v", f"{max(0.0, min(1.0, volume)):.2f}", path], cancel)
+        seconds = self._check(path)
+        self._run(["/usr/bin/afplay", "-v", f"{max(0.0, min(1.0, volume)):.2f}", path], cancel,
+                  seconds)
 
 
 class LinuxOutput(_CommandOutput):
@@ -411,21 +460,35 @@ class LinuxOutput(_CommandOutput):
 
     def __init__(self, popen=subprocess.Popen, which=shutil.which) -> None:
         super().__init__(popen)
-        self._command = next((name for name in ("pw-play", "paplay", "aplay") if which(name)), "")
+        self._commands = [name for name in ("pw-play", "paplay", "aplay") if which(name)]
 
     def play(self, path: str, volume: float, cancel: threading.Event) -> None:
-        if not self._command:
+        if not self._commands:
             return  # no player is the same as no sound device
-        self._check(path)
+        seconds = self._check(path)
         volume = max(0.0, min(1.0, volume))
-        if self._command == "pw-play":
-            self._run(["pw-play", f"--volume={volume:.2f}", path], cancel)
-        elif self._command == "paplay":
-            self._run(["paplay", f"--volume={int(volume * 65536)}", path], cancel)
-        else:
-            self._aplay(path, volume, cancel)
+        # Having a player doesn't mean its sound server is running: pipewire-bin can be installed
+        # on a PulseAudio desktop. One that fails is passed over from then on, unless it's the last.
+        while True:
+            try:
+                self._play_with(self._commands[0], path, volume, cancel, seconds)
+                return
+            except (SoundProblem, OSError):
+                if len(self._commands) == 1 or cancel.is_set():
+                    raise
+                self._commands.pop(0)
 
-    def _aplay(self, path: str, volume: float, cancel: threading.Event) -> None:
+    def _play_with(self, command: str, path: str, volume: float, cancel: threading.Event,
+                   seconds: float) -> None:
+        if command == "pw-play":
+            self._run(["pw-play", f"--volume={volume:.2f}", path], cancel, seconds)
+        elif command == "paplay":
+            # PulseAudio's scale is cubic: this value is the linear volume everything else uses.
+            self._run(["paplay", f"--volume={int(volume ** (1 / 3) * 65536)}", path], cancel, seconds)
+        else:
+            self._aplay(path, volume, cancel, seconds)
+
+    def _aplay(self, path: str, volume: float, cancel: threading.Event, seconds: float) -> None:
         # aplay has no volume, so it gets a scaled copy.
         params, frames = read_wav(path)
         handle, copy = tempfile.mkstemp(suffix=".wav", prefix="sound-")
@@ -434,7 +497,7 @@ class LinuxOutput(_CommandOutput):
             with wave.open(copy, "wb") as writer:
                 writer.setparams(params)
                 writer.writeframes(scaled(frames, volume))
-            self._run(["aplay", "-q", copy], cancel)
+            self._run(["aplay", "-q", copy], cancel, seconds)
         finally:
             try:
                 os.unlink(copy)

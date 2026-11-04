@@ -9,6 +9,8 @@ import wave
 
 import pytest
 
+from pathlib import Path
+
 from theideaplace_appkit import sounds
 from theideaplace_appkit.sounds import AMBIENT, NORMAL, URGENT, SoundPlayer, SoundPolicy, SoundProblem
 
@@ -152,6 +154,81 @@ def test_urgent_leaves_a_normal_sound_alone_and_goes_ahead_of_the_queue():
     player.close()
 
 
+def test_urgent_sounds_keep_their_order_and_none_is_lost():
+    output = FakeOutput(hold=True)
+    player = SoundPlayer(output)
+    player.play("sent")
+    assert output.started.wait(2)
+    for name in "abcde":
+        assert player.play(name, priority=URGENT)
+    output.release.set()
+    settle(player)
+    assert [p for p, _ in output.played] == ["sent", "a", "b", "c", "d", "e"]
+    player.close()
+
+
+def test_urgent_clears_a_tap_still_waiting():
+    output = FakeOutput()
+    player = SoundPlayer(output)
+    with player._lock:  # holds the worker off, so the tap is still waiting
+        player._queue.append(sounds._Item("tap", "tap", AMBIENT, 1.0, None, False))
+        player._add_urgent(sounds._Item("attention", "attention", URGENT, 1.0, None, False))
+        assert [i.path for i in player._queue] == ["attention"]
+    player.close()
+
+
+def test_urgent_cuts_off_a_long_sound_after_a_moment(monkeypatch):
+    monkeypatch.setattr(sounds, "URGENT_WAIT_SECONDS", 0.05)
+    output = FakeOutput(hold=True)
+    player = SoundPlayer(output)
+    player.play("my long file")
+    assert output.started.wait(2)
+    player.play("attention", priority=URGENT)
+    time.sleep(0.01)
+    assert output.cancelled == []
+    end = time.monotonic() + 2
+    while not output.cancelled and time.monotonic() < end:
+        time.sleep(0.002)
+    assert output.cancelled == ["my long file"]
+    output.release.set()
+    settle(player)
+    player.close()
+
+
+def test_preview_leaves_an_alert_waiting():
+    output = FakeOutput(hold=True)
+    player = SoundPlayer(output)
+    player.play("sent")
+    assert output.started.wait(2)
+    player.play("attention", priority=URGENT)
+    player.preview("p")
+    output.release.set()
+    settle(player)
+    assert [p for p, _ in output.played] == ["sent", "attention", "p"]
+    player.close()
+
+
+def test_a_preview_can_fall_back():
+    output = FakeOutput(fail=["gone"])
+    player = SoundPlayer(output)
+    player.preview("gone", fallback="builtin")
+    settle(player)
+    assert [p for p, _ in output.played] == ["gone", "builtin"]
+    player.close()
+
+
+def test_no_thread_to_be_had_never_reaches_the_caller(monkeypatch):
+    def refuse(self):
+        raise RuntimeError("can't start new thread")
+    monkeypatch.setattr(threading.Thread, "start", refuse)
+    player = SoundPlayer(FakeOutput())
+    assert player.play("a") in (True, False)
+    assert not player.busy
+    player.preview("b")
+    assert not player.busy
+    player.close()
+
+
 def test_stop_cuts_off_and_forgets_what_waits():
     output = FakeOutput(hold=True)
     player = SoundPlayer(output)
@@ -265,6 +342,7 @@ def test_safe_names(name):
 
 @pytest.mark.parametrize("name", [
     "", ".", "..", "../x.wav", "..\\x.wav", "a/b.wav", "a\\b.wav", "C:x.wav", "COM1.wav",
+    "COM1 .wav", "COM\u00b9.wav", "LPT\u00b3.wav",
     "com1", "LPT9.wav", "nul.wav", "CON.x.wav", "x.wav.", "x.wav ", "a\x01.wav", "a?.wav"])
 def test_unsafe_names(name):
     assert not sounds.safe_file_name(name)
@@ -289,6 +367,26 @@ def test_read_wav_takes_16_bit_mono_and_stereo(tmp_path):
 def test_read_wav_refuses_what_it_cannot_play(tmp_path, build):
     with pytest.raises(SoundProblem):
         sounds.read_wav(build(tmp_path / "x.wav"))
+
+
+def test_read_wav_refuses_an_absurd_sample_rate(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    data = bytearray(Path(path).read_bytes())
+    data[24:28] = struct.pack("<I", 0xFFFFFFFF)
+    Path(path).write_bytes(data)
+    with pytest.raises(SoundProblem):
+        sounds.read_wav(path)
+
+
+def test_read_wav_trims_a_file_cut_off_mid_frame(tmp_path):
+    path = make_wav(tmp_path / "x.wav", channels=2)
+    data = Path(path).read_bytes()
+    Path(path).write_bytes(data[:-1])
+    try:
+        _params, frames = sounds.read_wav(path)
+    except SoundProblem:
+        return  # refused outright is fine too
+    assert len(frames) % 4 == 0
 
 
 def test_read_wav_refuses_a_huge_file_before_reading_it(tmp_path, monkeypatch):
@@ -382,7 +480,47 @@ def test_linux_prefers_pipewire_then_pulse(tmp_path):
     popen, calls = recording()
     linux(popen, "pw-play", "paplay", "aplay").play(path, 0.5, threading.Event())
     linux(popen, "paplay", "aplay").play(path, 0.5, threading.Event())
-    assert calls == [["pw-play", "--volume=0.50", path], ["paplay", "--volume=32768", path]]
+    assert calls == [["pw-play", "--volume=0.50", path],
+                     ["paplay", f"--volume={int(0.5 ** (1 / 3) * 65536)}", path]]
+
+
+def test_pulseaudio_gets_the_same_loudness_on_its_cubic_scale(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    popen, calls = recording()
+    linux(popen, "paplay").play(path, 0.125, threading.Event())
+    assert calls == [["paplay", "--volume=32768", path]]
+
+
+def test_linux_passes_over_a_player_whose_server_is_not_there(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    calls = []
+
+    def popen(command, **kwargs):
+        calls.append(command[0])
+        return FakeProcess(code=1 if command[0] == "pw-play" else 0)
+    output = linux(popen, "pw-play", "paplay")
+    output.play(path, 1.0, threading.Event())
+    output.play(path, 1.0, threading.Event())
+    assert calls == ["pw-play", "paplay", "paplay"]
+
+
+def test_linux_says_so_when_the_last_player_fails(tmp_path):
+    path = make_wav(tmp_path / "x.wav")
+    popen, _ = recording(FakeProcess(code=1))
+    with pytest.raises(SoundProblem):
+        linux(popen, "pw-play").play(path, 1.0, threading.Event())
+
+
+def test_a_player_that_hangs_is_killed_and_reported(tmp_path, monkeypatch):
+    path = make_wav(tmp_path / "x.wav")
+    process = FakeProcess(runs=True)
+    popen, _ = recording(process)
+    now = [100.0]
+    monkeypatch.setattr(sounds.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(sounds.time, "sleep", lambda s: now.__setitem__(0, now[0] + 10))
+    with pytest.raises(SoundProblem, match="didn't finish"):
+        sounds.AfplayOutput(popen).play(path, 1.0, threading.Event())
+    assert process.terminated
 
 
 def test_linux_aplay_plays_a_scaled_copy_and_removes_it(tmp_path):
