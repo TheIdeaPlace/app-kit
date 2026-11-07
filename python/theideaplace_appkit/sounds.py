@@ -102,11 +102,13 @@ def _format_tag(data: bytes) -> Optional[int]:
     return None
 
 
-def read_wav_bytes(data: bytes, limit_seconds: float = MAX_SECONDS) -> Tuple[object, bytes]:
-    """``read_wav`` for bytes already read, such as a sound in a scheme file."""
+def read_wav_bytes(data: bytes, limit_seconds: float = MAX_SECONDS, strict: bool = False) -> Tuple[object, bytes]:
+    """``read_wav`` for bytes already read. ``strict``: only plain PCM (format tag 1), for a
+    sound in a scheme file, which every app on every Python has to read alike. A person's own
+    file isn't held to that, so a WAVE_FORMAT_EXTENSIBLE file that plays keeps playing."""
     if len(data) > MAX_BYTES:
         raise SoundProblem(f"It's larger than {MAX_BYTES // (1024 * 1024)} MB.")
-    if _format_tag(data) != 1:
+    if strict and _format_tag(data) != 1:
         raise SoundProblem("It has to be a 16-bit PCM WAV file.")
     try:
         with wave.open(io.BytesIO(data), "rb") as reader:

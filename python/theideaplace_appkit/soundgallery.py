@@ -18,7 +18,6 @@ import json
 import re
 import ssl
 import threading
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -220,7 +219,7 @@ def base_ok(base: str) -> bool:
     """A gallery address an app may use: https, a folder on this computer, or http on this
     computer only. Never a network share (``\\\\host\\share``), which on Windows would send your
     sign-in to that host, and never an address with a user name in it."""
-    if base.startswith(("\\\\", "//")):
+    if base.replace("\\", "/").startswith("//"):  # any two separators: a share on Windows
         return False
     parsed = urllib.parse.urlparse(base)
     if parsed.username is not None or parsed.password is not None:

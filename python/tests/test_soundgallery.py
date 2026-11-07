@@ -202,7 +202,8 @@ def test_damaged_lists_are_only_ever_a_gallery_problem():
 
 
 @pytest.mark.parametrize("base", [r"\\evil.com\share", "//evil.com/share", "https://user@example.com/",
-                                  "http://u:p@127.0.0.1/", "file://evil.com/share"])
+                                  "http://u:p@127.0.0.1/", "file://evil.com/share",
+                                  "/\\evil.com\\share", "\\/evil.com/share"])
 def test_shares_and_user_names_are_refused(base):
     assert sg.base_ok(base) is False
 

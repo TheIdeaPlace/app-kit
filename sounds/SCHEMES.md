@@ -31,6 +31,8 @@ and #32.
   - 256 KB is 262,144.
 - **Lengths** are counted in UTF-16 code units, so an emoji counts as two.
 - **Control characters** are Unicode category Cc: U+0000 to U+001F and U+007F to U+009F.
+- **Ignoring case** compares each character's simple uppercase, one character for one (.NET's
+  `OrdinalIgnoreCase`), so `Knock.wav` and `KNOCK.WAV` match but `straße` and `STRASSE` don't.
 
 ## Cleaning text from a file
 
@@ -91,11 +93,12 @@ A **safe file name**:
   and is unique ignoring case.
 - **A scheme id the app doesn't have** plays as Glass.
 
-### Sound files an app plays
+### Sounds in a scheme file
 
-A 16-bit PCM WAV (format tag 1, not WAVE_FORMAT_EXTENSIBLE), mono or stereo, 8 to 192 kHz, at most
-30 seconds and 5 MB. QuickMail also plays MP3 for files a person picks on their own computer.
-Nothing in the gallery is anything but WAV.
+A sound in a scheme file, or in the gallery, is one every app reads alike: a 16-bit PCM WAV
+(format tag 1, not WAVE_FORMAT_EXTENSIBLE), mono or stereo, 8 to 192 kHz, at most 30 seconds and
+5 MB. A file a person picks for themselves on their own computer is up to each app: QuickMail plays
+MP3 too, and either app may play a WAVE_FORMAT_EXTENSIBLE file it can read.
 
 ## A scheme file
 
@@ -150,8 +153,8 @@ while reading, from the bytes actually read, never from what the archive says ab
 - **Size:** the whole file is at most 80 MB, counting every byte decompressed, and has at most 64
   entries. Otherwise: "This sound scheme is too large to use." or the unreadable message.
 - **Entry names:** `\` in a name is read as `/`. Only `scheme.json` and `sounds/<safe file name>`
-  are read; every other entry is ignored and never written anywhere. If a name appears twice, the
-  first counts.
+  are read; every other entry, including one whose name contains a NUL, is ignored and never
+  written anywhere. If a name appears twice, the first counts.
 - **Compression:** only stored and DEFLATE entries that aren't encrypted can be read. If
   `scheme.json` can't be read, the whole file can't be. If a sound can't be read, it's dropped.
 - **scheme.json** is strict JSON (above), at most 64 KB. If it isn't, the message is "This file
@@ -160,8 +163,9 @@ while reading, from the bytes actually read, never from what the archive says ab
   A value that can't be used becomes `none`.
 - **Sounds:** each `custom:` file an event uses is taken from the ZIP, in the app's event order.
   - It's **dropped** if it's missing from the ZIP and not already in the app's sounds folder, larger
-    than 5 MB, damaged, not a sound the app plays, or named the same as an earlier file apart from
-    case (Windows would treat the two as one file).
+    than 5 MB, damaged, not a sound the scheme file may hold, or named the same, ignoring case, as an
+    earlier file the scheme uses, whether or not that one was kept (Windows would treat the two as
+    one file).
   - A file that isn't in the ZIP but is already in the app's sounds folder is used as it is.
   - Every event that used a dropped file becomes `none`, and the person is told how many events
     that is: the **dropped** count. A value that couldn't be used in the first place isn't counted.

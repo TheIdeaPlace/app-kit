@@ -152,6 +152,13 @@ def app_name(app_id: object) -> str:
     return clean_line(app_id, MAX_APP_NAME) or "another app"
 
 
+def fold(text: str) -> str:
+    """``text`` for comparing ignoring case, as SCHEMES.md defines it: each character's simple
+    uppercase, one character for one (.NET's OrdinalIgnoreCase), so "straße" and "STRASSE"
+    stay different in every app."""
+    return "".join(u if len(u := c.upper()) == 1 else c for c in text)
+
+
 def name_problem(name: str, taken: Iterable[str] = ()) -> Optional[str]:
     """Why ``name`` can't be a scheme's name, in words to show, or None."""
     name = name.strip()
@@ -161,21 +168,21 @@ def name_problem(name: str, taken: Iterable[str] = ()) -> Optional[str]:
         return "A scheme's name can't have control characters."
     if utf16_length(name) > MAX_NAME:
         return f"A scheme's name can be at most {MAX_NAME} characters."
-    if name.casefold() in {t.casefold() for t in taken}:
+    if fold(name) in {fold(t) for t in taken}:
         return f"There's already a scheme called {name}."
     return None
 
 
 def unique_name(name: str, taken: Iterable[str]) -> str:
     """``name``, or ``name 2``, ``name 3`` and so on, whichever isn't taken, within 60 characters."""
-    folded = {t.casefold() for t in taken}
-    if name.casefold() not in folded:
+    folded = {fold(t) for t in taken}
+    if fold(name) not in folded:
         return name
     number = 2
     while True:
         suffix = f" {number}"
         candidate = cut(name, MAX_NAME - len(suffix)).rstrip() + suffix
-        if candidate.casefold() not in folded:
+        if fold(candidate) not in folded:
             return candidate
         number += 1
 
@@ -300,7 +307,7 @@ def wav_problem(data: bytes) -> Optional[str]:
     """Why these bytes aren't a sound every app can play (a 16-bit PCM WAV, mono or stereo,
     8 to 192 kHz, at most 30 seconds and 5 MB), or None. Never raises."""
     try:
-        read_wav_bytes(data)
+        read_wav_bytes(data, strict=True)
     except SoundProblem as exc:
         return str(exc)
     except Exception as exc:  # noqa: BLE001 - anything else about a hostile file is a problem too
@@ -434,10 +441,10 @@ def read_scheme_file(source: Union[str, os.PathLike, bytes], app: AppCatalog, *,
             folded: Set[str] = set()
             for name in files_used(app, scheme.events, allow_mp3):
                 # Names that differ only in case are one file on Windows: the first counts.
-                if name.casefold() in folded:
+                if fold(name) in folded:
                     dropped_files.add(name)
                     continue
-                folded.add(name.casefold())
+                folded.add(fold(name))
                 info = entries.get(name)
                 if info is None:
                     if not have_file(name):
@@ -504,7 +511,7 @@ def _scheme_from_json(meta: dict, app: AppCatalog, unreadable: str, allow_mp3: b
 
 def write_scheme_file(scheme: SchemeFile, app: AppCatalog,
                       read_sound: Callable[[str], Optional[bytes]] = lambda name: None, *,
-                      built_in: bool = False, scheme_pack: Optional[str] = None,
+                      built_in: bool, scheme_pack: Optional[str],
                       allow_mp3: bool = False) -> bytes:
     """A scheme file's bytes, the same for the same scheme every time.
 
@@ -590,7 +597,8 @@ def install_sounds(scheme: SchemeFile, folder: Union[str, os.PathLike]) -> Insta
                 renamed[name] = candidate
                 break
             try:
-                with open(path, "xb") as handle:
+                # Unbuffered, so a failed write fails here and the file is removed.
+                with open(path, "xb", buffering=0) as handle:
                     try:
                         handle.write(data)
                     except BaseException:

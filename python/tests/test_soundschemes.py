@@ -123,8 +123,10 @@ def test_writing_gives_the_same_bytes_and_reads_back(tmp_path):
                                                     "NeedsYou": "custom:gone.wav",
                                                     "ReplyFinished": "builtin:wood/arrived"},
                            author="Me", description="Quiet.")
-    first = ss.write_scheme_file(scheme, TCP, read_sound=lambda n: knock if n == "knock.wav" else None)
-    again = ss.write_scheme_file(scheme, TCP, read_sound=lambda n: knock if n == "knock.wav" else None)
+    first = ss.write_scheme_file(scheme, TCP, read_sound=lambda n: knock if n == "knock.wav" else None,
+                                 built_in=False, scheme_pack=None)
+    again = ss.write_scheme_file(scheme, TCP, read_sound=lambda n: knock if n == "knock.wav" else None,
+                                 built_in=False, scheme_pack=None)
     assert first == again
     with zipfile.ZipFile(io.BytesIO(first)) as zf:
         assert zf.namelist() == ["scheme.json", "sounds/knock.wav"]
@@ -203,10 +205,31 @@ def test_a_damaged_wav_is_a_problem_not_an_exception():
         assert ss.wav_problem(bytes(data)) is None or isinstance(ss.wav_problem(bytes(data)), str)
 
 
+def test_writing_has_to_say_whether_the_scheme_is_built_in():
+    with pytest.raises(TypeError):
+        ss.write_scheme_file(ss.SchemeFile("thechatplace", "Glass", {}), TCP)
+
+
+def test_ignoring_case_is_one_character_for_one():
+    assert ss.fold("Knock.WAV") == ss.fold("knock.wav")
+    assert ss.fold("stra\u00dfe") != ss.fold("STRASSE")
+    assert ss.unique_name("Stra\u00dfe", ["STRASSE"]) == "Stra\u00dfe"
+
+
 def test_only_plain_pcm_is_a_wav_every_app_plays():
     good = bytearray(zipfile.ZipFile(TESTDATA / "tcp-good.tcpsounds").read("sounds/knock.wav"))
     good[20:22] = (0xFFFE).to_bytes(2, "little")  # WAVE_FORMAT_EXTENSIBLE
     assert "PCM" in ss.wav_problem(bytes(good))
+
+
+def test_a_persons_own_extensible_wav_still_plays():
+    from theideaplace_appkit import sounds
+    good = bytearray(zipfile.ZipFile(TESTDATA / "tcp-good.tcpsounds").read("sounds/knock.wav"))
+    good[20:22] = (0xFFFE).to_bytes(2, "little")
+    try:
+        sounds.read_wav_bytes(bytes(good))
+    except sounds.SoundProblem as exc:  # only Python itself may refuse it (before 3.12)
+        assert "PCM WAV file." not in str(exc)
 
 
 @pytest.mark.parametrize("name,ok", [
@@ -224,7 +247,7 @@ def test_unpaired_surrogates_are_cleaned_and_never_crash():
 
 
 def test_a_written_file_is_the_same_bytes_on_every_system():
-    data = ss.write_scheme_file(ss.SchemeFile("thechatplace", "X", {}), TCP)
+    data = ss.write_scheme_file(ss.SchemeFile("thechatplace", "X", {}), TCP, built_in=False, scheme_pack=None)
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         assert all(info.create_system == 0 for info in zf.infolist())
 
