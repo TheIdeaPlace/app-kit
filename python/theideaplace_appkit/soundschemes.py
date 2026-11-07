@@ -105,6 +105,11 @@ def _apps() -> Mapping[str, AppCatalog]:
             for app_id, app in raw["apps"].items()}
 
 
+def apps() -> Dict[str, AppCatalog]:
+    """Every app app-kit knows, by id, in apps.json's order (the gallery builds one list each)."""
+    return dict(_apps())
+
+
 def catalog(app_id: str) -> AppCatalog:
     """The app's events and sounds. Raises KeyError for an app app-kit doesn't know."""
     return _apps()[app_id]
