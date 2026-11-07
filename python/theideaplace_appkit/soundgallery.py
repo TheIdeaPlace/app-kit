@@ -305,6 +305,9 @@ def _fetch_http(url: str, limit: int, timeout: float, context, user_agent: str, 
             raise Unreachable("timed out")
     except GalleryProblem:
         raise
+    except urllib.error.HTTPError as exc:  # an answer other than 200, redirects included
+        exc.close()  # it holds the connection open otherwise
+        raise Unreachable(f"HTTP {exc.code}") from None
     except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
         raise Unreachable(str(exc)) from exc
 
