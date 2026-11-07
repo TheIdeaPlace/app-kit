@@ -22,6 +22,15 @@ be tested on its own and used from any app.
   `read_wav`, which checks a person's own file, `safe_file_name`, and `quiet_now`, for
   presentations and full-screen programs. Used by The Chat Place (TheIdeaPlace/AIChat#250).
 
+- `soundschemes`: sound schemes and scheme files as `sounds/SCHEMES.md` sets them out. `catalog`
+  gives an app's events from `apps.json`; `parse_ref`, `resolve` and `portable` handle a stored
+  sound; `read_scheme_file` checks a file from anywhere and `write_scheme_file` makes one the same
+  way every time; `install_sounds` puts an imported scheme's sounds in the app's folder.
+
+- `soundgallery`: the sound gallery's signed list and checked downloads. `Gallery(app).schemes()`
+  and `.download(entry)`, raising a `GalleryProblem` whose text can be shown. Checking the signature
+  needs the `gallery` extra (`pycryptodomex`), or `cryptography`.
+
 ## Using it
 
 Pin a tag or a commit of main in the app's `requirements.txt`:

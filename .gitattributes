@@ -1,3 +1,7 @@
 * text=auto
 *.sh text eol=lf
 *.wav binary
+# Test files are exact bytes: a signature covers every byte, so no line-ending changes.
+sounds/testdata/*.signed binary
+sounds/testdata/*.tcpsounds binary
+sounds/testdata/*.qmsounds binary

@@ -10,6 +10,10 @@ Python player is `theideaplace_appkit.sounds` (see `python/README.md`), built fo
 copies the WAVs it uses and records the commit they came from, since a pip install of `python/` can't
 reach this folder.
 
+Sound schemes, scheme files and the sound gallery work the same in every app: `SCHEMES.md` is the
+spec, `apps.json` lists each app's events, and `testdata/` holds files every implementation is
+checked against.
+
 **These are a first version.** QuickMail ships all three styles and is asking its users what they
 think, so expect them to change.
 
