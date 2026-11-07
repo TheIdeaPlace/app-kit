@@ -4,10 +4,11 @@ Short sounds any app can use, and the rules for how an app should use them. The 
 [QuickMail](https://github.com/kellylford/QuickMail/issues/912). The Chat Place and GHManage are
 likely next.
 
-This folder holds files and rules rather than code an app calls, because the apps don't share a
-language. QuickMail's C# player stays in QuickMail for now, and moves to `TheIdeaPlace.AppKit` when a
-second .NET app wants sounds. A Python player belongs in `theideaplace-appkit`, built with the first
-Python app that adopts sounds.
+This folder holds files and rules, because the apps don't share a language. QuickMail's C# player
+stays in QuickMail for now, and moves to `TheIdeaPlace.AppKit` when a second .NET app wants sounds. The
+Python player is `theideaplace_appkit.sounds` (see `python/README.md`), built for The Chat Place. An app
+copies the WAVs it uses and records the commit they came from, since a pip install of `python/` can't
+reach this folder.
 
 **These are a first version.** QuickMail ships all three styles and is asking its users what they
 think, so expect them to change.
@@ -18,7 +19,8 @@ There are three styles, in `glass/`, `softbell/` and `wood/`. Each has every sou
 same melody, and only the tone differs, so a sound means the same thing in any style. Wood also
 measures somewhat quieter than the other two.
 
-Each file is a 44.1 kHz, 16-bit mono WAV, under one second, peaking at about -6 dB. Everything is
+Each file is a 44.1 kHz, 16-bit mono WAV, under one second, peaking at about -6 dB, apart from the soft
+ones below, which sit under speech. Everything is
 generated, so there is nothing to license: the sounds are under this repo's license like the code.
 
 Names say what happened, not which app it happened in. Each app maps its own events to them.
@@ -39,6 +41,17 @@ Names say what happened, not which app it happened in. Each app maps its own eve
 | `filed` | Something was put away | Two quick notes, a small step up | Message archived |
 | `moved` | Something was moved | Two quick notes, a bigger step up | Message moved |
 | `matched` | A rule of yours fired | One bright note | Default for a rule |
+
+These are soft, for things that happen often or that you aren't looking at. They're first used by The
+Chat Place:
+
+| Name | Meaning | Shape | Peak | In The Chat Place |
+|---|---|---|---|---|
+| `tap` | Something is going on | One note, 70 ms | -15 dB | A tool ran |
+| `changed` | Something is going on, and it changed something | Two quick notes, rising | -13 dB | A file changed |
+| `pulse` | Still going | One low note, 120 ms | -18 dB | Still working, after a silence |
+| `elsewhere` | Something new came in somewhere else | `arrived`'s rise, lower | -10 dB | Another chat finished |
+| `stopped` | You ended something | One low note, damped | -8 dB | You stopped a turn |
 
 Rising means something went or came right; falling means something was lost or failed.
 
@@ -71,12 +84,14 @@ These come from building and measuring QuickMail's sounds. Apply them unless you
 
 - Play one at a time from a short queue, and drop anything past that rather than delaying it. QuickMail keeps at most 3 waiting.
 - Drop the same sound repeated within a second.
+- A sound that only says something is going on never waits: drop it if anything is playing or queued, since late it says nothing, and play at most one every 200 ms.
+- Let what the person must hear go first, cutting off anything of that kind.
 - One sound for a batch, not one per item.
 - No sound for a backlog: nothing older than launch, and nothing for more than a few items at once, such as after waking up.
 
 **Don't sound twice**
 
-- A Windows toast plays its own sound unless it's marked silent, so silence it when your sound plays (measured).
+- A Windows toast or tray balloon plays its own sound unless it's marked silent (measured), so your sound can be a second one. Offer a setting to leave it out, off to start: what Windows does for someone's notifications is theirs to change. wx's `ShowBalloon` can't ask for `NIIF_NOSOUND`.
 - If two things can sound for one item, record which item was sounded rather than relying on a timer.
 
 **Stay quiet at the right times**
@@ -89,6 +104,8 @@ These come from building and measuring QuickMail's sounds. Apply them unless you
 
 - Never let an audio problem reach the caller or delay real work. Play on a background thread, and treat no audio device as normal.
 - Open the device per sound, so it follows the default device and doesn't hold it awake.
+- In Python on Windows, don't use `winsound` or `wx.adv.Sound`: `PlaySound` held a 40 ms clip for about 500 ms and can't be cut off from another thread (measured). `waveOut` through ctypes took about 75 ms and stops at once.
+- Cutting a sound off and closing the device straight away can put a faint click out afterwards, about one time in seven with `waveOut` (measured). Holding the device open for 100 ms stopped it.
 - A player may report it has stopped while audio is still in its buffer. With NAudio 3.3 this lost about 50 ms from every sound; 200 ms of trailing silence fixed it.
 - Limit the length of any file you didn't make when you open it, not only when it's chosen, since settings files and hand-copied files skip the chooser.
 - Refuse file names that are Windows device names, such as `COM1.wav`, and store only a bare file name, never a path.

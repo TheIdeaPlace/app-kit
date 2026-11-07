@@ -4,6 +4,8 @@ import sys
 import wave
 from pathlib import Path
 
+from generate import peak_of
+
 bad = 0
 for path in sorted(p for p in Path(sys.argv[1]).rglob("*.wav") if not p.name.startswith("Listen")):
     with wave.open(str(path)) as w:
@@ -17,9 +19,11 @@ for path in sorted(p for p in Path(sys.argv[1]).rglob("*.wav") if not p.name.sta
     problems = []
     if fmt != (1, 2, 44100): problems.append(f"format {fmt}")
     if seconds > 1.0: problems.append("too long")
-    if not 0.49 <= peak <= 0.51: problems.append("peak off")
+    expected = peak_of(path.stem)
+    if abs(peak - expected) > 0.01: problems.append(f"peak off, expected {expected}")
     if abs(s[0]) > 400: problems.append(f"starts at {s[0]}")
     if abs(s[-1]) > 40: problems.append(f"ends at {s[-1]}")
     bad += bool(problems)
     print(f"{path.parent.name}/{path.stem:13} {seconds:.2f}s peak {peak:.2f} rms {rms:.3f} maxjump {jump:.3f} {' '.join(problems)}")
 print("problems:", bad)
+sys.exit(1 if bad else 0)
