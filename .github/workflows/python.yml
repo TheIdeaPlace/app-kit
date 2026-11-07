@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install
-        run: python -m pip install pytest ./python
+        run: python -m pip install pytest cryptography "./python[gallery]"
       - name: Test
         working-directory: python
         run: python -W error -m pytest -q tests

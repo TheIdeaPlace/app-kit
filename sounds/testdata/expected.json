@@ -1,0 +1,48 @@
+{
+  "about": "What each file in this folder must give, read by the app named, with test-key.pub.pem as the gallery key. 'untrusted', 'needsUpdate' and 'unreadable' are the three kinds of refusal; a scheme file's message is given where the spec words it.",
+  "indexes": {
+    "index-good.signed": { "thechatplace": { "ids": ["rain-at-night", "bells"], "eventsWithSound": [15, 3] }, "quickmail": "untrusted" },
+    "index-other-app.signed": { "thechatplace": "untrusted", "quickmail": { "ids": ["wrong-ext"] } },
+    "index-no-app.signed": { "thechatplace": "untrusted" },
+    "index-format2.signed": { "thechatplace": "needsUpdate" },
+    "index-wrong-key.signed": { "thechatplace": "untrusted" },
+    "index-tampered.signed": { "thechatplace": "untrusted" },
+    "index-deep.signed": { "thechatplace": "untrusted" },
+    "index-junk-signature.signed": { "thechatplace": "untrusted" },
+    "index-no-newline.signed": { "thechatplace": "untrusted" }
+  },
+  "schemes": {
+    "tcp-good.tcpsounds": {
+      "thechatplace": {
+        "name": "Rain at Night", "author": "Test Author", "license": "CC0-1.0", "description": "Soft sounds.",
+        "events": { "ToolRan": "builtin:softbell/tap", "ReplyFinished": "builtin:arrived", "NeedsYou": "custom:knock.wav", "TurnFailed": "none" },
+        "sounds": ["knock.wav"], "dropped": 0
+      },
+      "quickmail": { "refused": "This is a sound scheme for The Chat Place, so QuickMail can't use it." }
+    },
+    "qm-0869.qmsounds": {
+      "quickmail": {
+        "name": "Old QuickMail", "author": null, "license": null, "description": null,
+        "events": { "MessageSent": "builtin:glass/sent", "NewMail": "custom:ding.wav" },
+        "sounds": ["ding.wav"], "dropped": 0
+      },
+      "thechatplace": { "refused": "This is a sound scheme for QuickMail, so The Chat Place can't use it." }
+    },
+    "tcp-hostile.tcpsounds": {
+      "thechatplace": {
+        "name": "Hostile xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "author": "AB", "license": null, "description": null,
+        "events": {
+          "ToolRan": "none", "FileChanged": "none", "StillWorking": "none", "MessageSent": "none",
+          "MessageQueued": "none", "MessageNotSent": "none", "ReplyFinished": "none", "NeedsYou": "custom:good.wav",
+          "TurnFailed": "none", "TurnStopped": "none"
+        },
+        "sounds": ["good.wav"], "dropped": 2
+      }
+    },
+    "tcp-format2.tcpsounds": { "thechatplace": { "refused": "This sound scheme was made by a newer version of The Chat Place. Update The Chat Place and try again." } },
+    "tcp-unknown-app.tcpsounds": { "thechatplace": { "refused": "This is a sound scheme for someday, so The Chat Place can't use it." } },
+    "tcp-no-json.tcpsounds": { "thechatplace": { "refused": "This file could not be read as a sound scheme for The Chat Place." } },
+    "tcp-too-many.tcpsounds": { "thechatplace": { "refused": "This file could not be read as a sound scheme for The Chat Place." } },
+    "not-a-zip.tcpsounds": { "thechatplace": { "refused": "This file could not be read as a sound scheme for The Chat Place." } }
+  }
+}
