@@ -238,7 +238,7 @@ def _raw_server(reply: bytes, trickle: float = 0.0):
     b"garbage\r\n\r\n",
     b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n10\r\nshort",
     b"HTTP/1.1 200 OK\r\nX: " + b"a" * 70000 + b"\r\n\r\n",
-])
+], ids=["bad-status", "cut-off-chunk", "huge-header"])  # short: Windows caps the variable pytest names it in
 def test_broken_answers_are_unreachable(reply):
     with pytest.raises(sg.Unreachable):
         sg.fetch(_raw_server(reply), 1000, timeout=5)

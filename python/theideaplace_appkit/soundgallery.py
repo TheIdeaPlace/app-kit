@@ -179,9 +179,9 @@ def _entry(raw: object, app: AppCatalog) -> Optional[Entry]:
     if not isinstance(raw, dict):
         return None
     sid, sha, file, size = raw.get("id"), raw.get("sha256"), raw.get("file"), raw.get("size")
-    if not isinstance(sid, str) or not _ID.match(sid):
+    if not isinstance(sid, str) or not _ID.fullmatch(sid):
         return None
-    if not isinstance(sha, str) or not _SHA.match(sha):
+    if not isinstance(sha, str) or not _SHA.fullmatch(sha):
         return None
     if file != f"{sid}-{sha[:16]}{app.extension}":
         return None

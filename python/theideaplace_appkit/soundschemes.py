@@ -501,7 +501,7 @@ def _scheme_from_json(meta: dict, app: AppCatalog, unreadable: str, allow_mp3: b
     for count, (key, value) in enumerate(events.items()):
         if count >= MAX_EVENTS:
             break
-        if not _KEY.match(key) or key not in app.keys:
+        if not _KEY.fullmatch(key) or key not in app.keys:
             continue
         ref = parse_ref(value, app, allow_mp3)
         kept[key] = str(ref) if ref is not None else NONE
