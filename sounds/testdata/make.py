@@ -79,6 +79,30 @@ def scheme_zip(meta: dict | bytes | None, sounds: dict[str, bytes], extra: dict[
     return buffer.getvalue()
 
 
+def raw_zip(entries) -> bytes:
+    """A ZIP with exactly these entries, repeats included: (name, data[, compression or "damage"])."""
+    import warnings
+    buffer = io.BytesIO()
+    damage = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # repeated names are the point
+        with zipfile.ZipFile(buffer, "w") as zf:
+            for entry in entries:
+                name, data = entry[0], entry[1]
+                how = entry[2] if len(entry) > 2 else zipfile.ZIP_DEFLATED
+                info = zipfile.ZipInfo(name, date_time=ZIP_TIME)
+                info.compress_type = zipfile.ZIP_DEFLATED if how == "damage" else how
+                zf.writestr(info, data)
+                if how == "damage":
+                    damage.append(info)
+    out = bytearray(buffer.getvalue())
+    for info in damage:  # scramble the middle of its compressed data
+        start = info.header_offset + 30 + len(info.filename.encode())
+        for i in range(start + 2, start + min(info.compress_size, 40) - 2):
+            out[i] ^= 0x5A
+    return bytes(out)
+
+
 def main() -> None:
     test_key = key("test-key.pem")
     other_key = key("other-key.pem")
@@ -148,6 +172,40 @@ def main() -> None:
         {"format": 1, "app": "thechatplace", "name": "Many", "events": {}},
         {f"s{i}.wav": wav for i in range(64)})
     files["not-a-zip.tcpsounds"] = b"This is not a ZIP file."
+
+    # Cases the spec decides, each in its own file.
+    def meta(name="X", **events):
+        return {"format": 1, "app": "thechatplace", "name": name, "events": events}
+    files["tcp-duplicates.tcpsounds"] = raw_zip([
+        ("scheme.json", json.dumps(meta("First", NeedsYou="custom:a.wav", ToolRan="custom:b.wav")).encode()),
+        ("scheme.json", json.dumps(meta("Second")).encode()),
+        ("sounds/a.wav", wav), ("sounds/a.wav", tone(width=1)), ("sounds\\b.wav", wav)])
+    files["tcp-case.tcpsounds"] = scheme_zip(
+        meta(NeedsYou="custom:Knock.wav", ToolRan="custom:knock.wav"), {"Knock.wav": wav, "knock.wav": wav})
+    files["tcp-damaged-sounds.tcpsounds"] = raw_zip([
+        ("scheme.json", json.dumps(meta(NeedsYou="custom:lzma.wav", ToolRan="custom:damaged.wav",
+                                        TurnFailed="custom:big.wav", ReplyFinished="custom:fine.wav")).encode()),
+        ("sounds/lzma.wav", wav, zipfile.ZIP_LZMA), ("sounds/damaged.wav", wav, "damage"),
+        ("sounds/big.wav", bytes(6 * 1024 * 1024)), ("sounds/fine.wav", wav)])
+    files["tcp-big-json.tcpsounds"] = scheme_zip(dict(meta(), padding="x" * 70000), {})
+    files["tcp-bom.tcpsounds"] = scheme_zip(b"\xef\xbb\xbf" + json.dumps(meta("With BOM")).encode(), {})
+    files["tcp-repeated-key.tcpsounds"] = scheme_zip(
+        b'{"format": 1, "app": "thechatplace", "name": "Before", "name": "After", "events": {}}', {})
+    files["tcp-app-null.tcpsounds"] = scheme_zip({"format": 1, "app": None, "name": "Mail",
+                                                  "events": {"NewMail": "builtin:arrived"}}, {})
+    files["tcp-cases-and-trim.tcpsounds"] = scheme_zip(
+        meta("a" * 59 + " b", ToolRan="builtin:SoftBell/Tap", NeedsYou="None"), {})
+    files["tcp-nan.tcpsounds"] = scheme_zip(
+        b'{"format": 1, "app": "thechatplace", "name": "X", "author": NaN, "events": {}}', {})
+    files["tcp-surrogate.tcpsounds"] = scheme_zip(
+        b'{"format": 1, "app": "thechatplace", "name": "Rain \\ud800", "events": {}}', {})
+    files["tcp-huge-format.tcpsounds"] = scheme_zip(dict(meta(), format=99999999999999), {})
+    files["tcp-long-app.tcpsounds"] = scheme_zip(dict(meta(), app="some app\n" + "x" * 100), {})
+    good_line, _, good_index = files["index-good.signed"].partition(b"\n")
+    files["index-crlf.signed"] = good_line + b"\r\n" + good_index
+    files["index-bom.signed"] = signed(test_key, b"\xef\xbb\xbf" + json.dumps(tcp).encode())
+    files["index-huge-format.signed"] = signed(test_key, dict(tcp, format=99999999999999))
+    files["index-nan.signed"] = signed(test_key, json.dumps(tcp).replace('"size": 1234', '"size": NaN', 1).encode())
     for name, data in files.items():
         (HERE / name).write_bytes(data)
     print(f"Wrote {len(files)} files to {HERE}")

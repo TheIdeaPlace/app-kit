@@ -182,3 +182,70 @@ def test_a_download_larger_than_listed_is_not_the_listed_file(server):
 def test_nothing_reachable_is_unreachable():
     with pytest.raises(sg.Unreachable):
         sg.fetch("http://127.0.0.1:9/index.signed", 100, timeout=2)
+
+
+# -- from the review of #32 ------------------------------------------------------------
+
+
+def test_damaged_lists_are_only_ever_a_gallery_problem():
+    import random
+    rng = random.Random(8)
+    original = (TESTDATA / "index-good.signed").read_bytes()
+    for _ in range(500):
+        data = bytearray(original)
+        for _ in range(rng.randint(1, 4)):
+            data[rng.randrange(len(data))] = rng.randrange(256)
+        try:
+            sg.read_index(bytes(data), TCP, KEY)
+        except sg.GalleryProblem:
+            pass
+
+
+@pytest.mark.parametrize("base", [r"\\evil.com\share", "//evil.com/share", "https://user@example.com/",
+                                  "http://u:p@127.0.0.1/", "file://evil.com/share"])
+def test_shares_and_user_names_are_refused(base):
+    assert sg.base_ok(base) is False
+
+
+def _raw_server(reply: bytes, trickle: float = 0.0):
+    import socket
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+
+    def serve():
+        conn, _ = listener.accept()
+        conn.recv(4096)
+        try:
+            if trickle:
+                for b in reply:
+                    conn.sendall(bytes([b]))
+                    import time
+                    time.sleep(trickle)
+            else:
+                conn.sendall(reply)
+        except OSError:
+            pass
+        conn.close()
+        listener.close()
+    threading.Thread(target=serve, daemon=True).start()
+    return f"http://127.0.0.1:{listener.getsockname()[1]}/index.signed"
+
+
+@pytest.mark.parametrize("reply", [
+    b"garbage\r\n\r\n",
+    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n10\r\nshort",
+    b"HTTP/1.1 200 OK\r\nX: " + b"a" * 70000 + b"\r\n\r\n",
+])
+def test_broken_answers_are_unreachable(reply):
+    with pytest.raises(sg.Unreachable):
+        sg.fetch(_raw_server(reply), 1000, timeout=5)
+
+
+def test_a_trickle_is_cut_off_at_the_time_limit():
+    import time
+    url = _raw_server(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n" + b"x" * 100, trickle=0.05)
+    start = time.monotonic()
+    with pytest.raises(sg.Unreachable):
+        sg.fetch(url, 1000, timeout=1)
+    assert time.monotonic() - start < 3

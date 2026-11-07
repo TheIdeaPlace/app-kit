@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import array
 import collections
+import io
 import logging
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -78,7 +80,36 @@ def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, byt
     try:
         if os.path.getsize(path) > MAX_BYTES:
             raise SoundProblem(f"It's larger than {MAX_BYTES // (1024 * 1024)} MB.")
-        with wave.open(str(path), "rb") as reader:
+        with open(path, "rb") as handle:
+            data = handle.read(MAX_BYTES + 1)
+    except OSError as exc:
+        raise SoundProblem(f"It can't be read as a WAV file ({exc}).") from exc
+    return read_wav_bytes(data, limit_seconds)
+
+
+def _format_tag(data: bytes) -> Optional[int]:
+    """The ``fmt `` chunk's format tag, or None. Read here rather than left to ``wave``, which
+    takes WAVE_FORMAT_EXTENSIBLE from Python 3.12 on but not before: every app and every Python
+    has to accept the same files (sounds/SCHEMES.md), so only plain PCM (1) is."""
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        return None
+    at = 12
+    while at + 8 <= len(data):
+        size = struct.unpack_from("<I", data, at + 4)[0]
+        if data[at:at + 4] == b"fmt ":
+            return struct.unpack_from("<H", data, at + 8)[0] if size >= 2 and at + 10 <= len(data) else None
+        at += 8 + size + (size & 1)
+    return None
+
+
+def read_wav_bytes(data: bytes, limit_seconds: float = MAX_SECONDS) -> Tuple[object, bytes]:
+    """``read_wav`` for bytes already read, such as a sound in a scheme file."""
+    if len(data) > MAX_BYTES:
+        raise SoundProblem(f"It's larger than {MAX_BYTES // (1024 * 1024)} MB.")
+    if _format_tag(data) != 1:
+        raise SoundProblem("It has to be a 16-bit PCM WAV file.")
+    try:
+        with wave.open(io.BytesIO(data), "rb") as reader:
             params = reader.getparams()
             if params.sampwidth != 2 or params.nchannels not in (1, 2):
                 raise SoundProblem("It has to be a 16-bit WAV file, mono or stereo.")
@@ -89,7 +120,8 @@ def read_wav(path: str, limit_seconds: float = MAX_SECONDS) -> Tuple[object, byt
             frames = reader.readframes(params.nframes)
     except SoundProblem:
         raise
-    except (OSError, EOFError, wave.Error, ValueError) as exc:
+    # RuntimeError and struct.error: what wave's chunk reader raises for a bad chunk size.
+    except (OSError, EOFError, wave.Error, ValueError, RuntimeError, struct.error) as exc:
         raise SoundProblem(f"It can't be read as a WAV file ({exc}).") from exc
     # A file cut off partway through a frame: the device takes whole frames only.
     frames = frames[: len(frames) // (2 * params.nchannels) * (2 * params.nchannels)]

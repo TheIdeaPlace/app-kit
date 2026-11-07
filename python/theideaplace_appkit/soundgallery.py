@@ -12,10 +12,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import http.client
 import ipaddress
 import json
 import re
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -25,7 +27,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from .soundschemes import (MAX_AUTHOR, MAX_DESCRIPTION, MAX_FILE_BYTES, MAX_LICENSE, MAX_NAME,
-                           AppCatalog, clean_line)
+                           AppCatalog, _whole_number, clean_line, load_json)
 
 #: The gallery's key. Its private half signs from TheIdeaPlace/soundgallery's protected workflow.
 PUBLIC_KEY_PEM = b"""-----BEGIN PUBLIC KEY-----
@@ -117,7 +119,8 @@ def _verify_cryptography(signature_der: bytes, data: bytes, public_key_pem: byte
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import load_pem_public_key
     except ImportError as exc:  # pragma: no cover - an app ships one or the other
-        raise RuntimeError("Checking the gallery needs pycryptodomex or cryptography.") from exc
+        # Nothing can be checked, so nothing is trusted.
+        raise Untrusted("no signature check: install pycryptodomex or cryptography") from exc
     try:
         key = load_pem_public_key(public_key_pem)
         if not isinstance(key, ec.EllipticCurvePublicKey) or key.curve.name != "secp256r1":
@@ -131,39 +134,29 @@ def _verify_cryptography(signature_der: bytes, data: bytes, public_key_pem: byte
 # -- the list ------------------------------------------------------------------------
 
 
-def _depth(value, limit: int) -> bool:
-    """Whether ``value`` nests at most ``limit`` levels."""
-    if limit < 0:
-        return False
-    if isinstance(value, dict):
-        return all(_depth(v, limit - 1) for v in value.values())
-    if isinstance(value, list):
-        return all(_depth(v, limit - 1) for v in value)
-    return True
-
-
 def read_index(signed: bytes, app: AppCatalog, public_key_pem: bytes = PUBLIC_KEY_PEM) -> List[Entry]:
     """The schemes ``index.signed`` lists for ``app``. Raises Untrusted or NeedsUpdate."""
-    newline = signed.find(b"\n", 0, MAX_SIGNATURE_LINE + 1)
+    # The newline is one of the first 512 bytes; the line before it is base64 and nothing else.
+    newline = signed.find(b"\n", 0, MAX_SIGNATURE_LINE)
     if newline < 0:
         raise Untrusted("no signature line")
     index = signed[newline + 1:]
     if not 1 <= len(index) <= MAX_INDEX_BYTES:
         raise Untrusted("index size")
     try:
-        der = base64.b64decode(signed[:newline].strip(), validate=True)
+        der = base64.b64decode(signed[:newline], validate=True)
     except (ValueError, TypeError) as exc:
         raise Untrusted("signature isn't base64") from exc
     if not der or not verify(der, index, public_key_pem):
         raise Untrusted("signature")
     try:
-        value = json.loads(index.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        value = load_json(index, MAX_DEPTH, bom=False)
+    except (UnicodeDecodeError, ValueError) as exc:
         raise Untrusted("not JSON") from exc
-    if not isinstance(value, dict) or not _depth(value, MAX_DEPTH):
+    if not isinstance(value, dict):
         raise Untrusted("shape")
-    fmt = value.get("format")
-    if type(fmt) is not int or fmt < 1:
+    fmt = _whole_number(value.get("format"))
+    if fmt is None or fmt < 1:
         raise Untrusted("format")
     if fmt > 1:
         raise NeedsUpdate(app)
@@ -193,7 +186,7 @@ def _entry(raw: object, app: AppCatalog) -> Optional[Entry]:
         return None
     if file != f"{sid}-{sha[:16]}{app.extension}":
         return None
-    if type(size) is not int or not 1 <= size <= MAX_FILE_BYTES:
+    if _whole_number(size) is None or not 1 <= size <= MAX_FILE_BYTES:
         return None
     name = clean_line(raw.get("name"), MAX_NAME)
     author = clean_line(raw.get("author"), MAX_AUTHOR)
@@ -201,7 +194,7 @@ def _entry(raw: object, app: AppCatalog) -> Optional[Entry]:
     if not (name and author and licence):
         return None
     count = raw.get("eventsWithSound")
-    events = max(0, min(len(app.events), count)) if type(count) is int else None
+    events = max(0, min(len(app.events), count)) if _whole_number(count) is not None else None
     return Entry(sid, name, author, licence, clean_line(raw.get("description"), MAX_DESCRIPTION),
                  file, size, sha, events)
 
@@ -224,8 +217,16 @@ class _NoRedirects(urllib.request.HTTPRedirectHandler):
 
 
 def base_ok(base: str) -> bool:
-    """A gallery address an app may use: https, a folder, or http on this computer only."""
+    """A gallery address an app may use: https, a folder on this computer, or http on this
+    computer only. Never a network share (``\\\\host\\share``), which on Windows would send your
+    sign-in to that host, and never an address with a user name in it."""
+    if base.startswith(("\\\\", "//")):
+        return False
     parsed = urllib.parse.urlparse(base)
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    if parsed.scheme == "file":
+        return parsed.netloc in ("", "localhost")
     if parsed.scheme == "https":
         return bool(parsed.hostname)
     if parsed.scheme == "http":
@@ -236,13 +237,14 @@ def base_ok(base: str) -> bool:
             return ipaddress.ip_address(host).is_loopback
         except ValueError:
             return False
-    return parsed.scheme in ("", "file") or len(parsed.scheme) == 1  # a folder (C:\ has scheme "c")
+    return parsed.scheme == "" or len(parsed.scheme) == 1  # a folder (C:\ has scheme "c")
 
 
 def fetch(url: str, limit: int, timeout: float = TIMEOUT,
           context: Optional[ssl.SSLContext] = None, user_agent: str = "SoundGallery/1") -> bytes:
-    """At most ``limit`` bytes from ``url``. Raises Unreachable for anything but a 200 answer,
-    and Untrusted for a body over ``limit``."""
+    """At most ``limit`` bytes from ``url``, in at most ``timeout`` seconds all told: connecting,
+    the headers and the whole body. Raises Unreachable for anything but a 200 answer in time, and
+    Untrusted for a body over ``limit``."""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
         path = Path(urllib.request.url2pathname(parsed.path) if parsed.scheme == "file" else url)
@@ -254,29 +256,57 @@ def fetch(url: str, limit: int, timeout: float = TIMEOUT,
         if len(data) > limit:
             raise Untrusted("too large")
         return data
+    # The socket's timeout restarts with every byte, so a server sending a byte at a time could
+    # hold a read for hours. The read runs on its own thread instead, and is closed at the deadline.
+    state: dict = {}
+    done = threading.Event()
+
+    def work() -> None:
+        try:
+            state["data"] = _fetch_http(url, limit, timeout, context, user_agent, state)
+        except BaseException as exc:  # noqa: BLE001 - handed to the caller
+            state["error"] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=work, daemon=True, name="sound-gallery-fetch").start()
+    if not done.wait(timeout):
+        state["late"] = True
+        response = state.get("response")
+        if response is not None:
+            try:
+                response.close()
+            except Exception:  # noqa: BLE001 - only closing it early
+                pass
+        raise Unreachable("timed out")
+    if "error" in state:
+        raise state["error"]
+    return state["data"]
+
+
+def _fetch_http(url: str, limit: int, timeout: float, context, user_agent: str, state: dict) -> bytes:
     opener = urllib.request.build_opener(_NoRedirects, urllib.request.HTTPSHandler(context=context))
     request = urllib.request.Request(url, headers={"User-Agent": user_agent})
-    deadline = time.monotonic() + timeout
     try:
         with opener.open(request, timeout=timeout) as response:
+            state["response"] = response
             if response.status != 200:
                 raise Unreachable(f"HTTP {response.status}")
             length = response.headers.get("Content-Length")
             if length is not None and length.isdigit() and int(length) > limit:
                 raise Untrusted("too large")
             out = bytearray()
-            while True:
-                if time.monotonic() > deadline:
-                    raise Unreachable("timed out")
-                chunk = response.read(64 * 1024)
+            while not state.get("late"):
+                chunk = response.read1(64 * 1024) if hasattr(response, "read1") else response.read(64 * 1024)
                 if not chunk:
                     return bytes(out)
                 out += chunk
                 if len(out) > limit:
                     raise Untrusted("too large")
+            raise Unreachable("timed out")
     except GalleryProblem:
         raise
-    except (urllib.error.URLError, OSError, ValueError) as exc:
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
         raise Unreachable(str(exc)) from exc
 
 

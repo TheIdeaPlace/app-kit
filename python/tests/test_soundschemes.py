@@ -172,3 +172,84 @@ def _zip(meta, sounds=None):
         for name, data in (sounds or {}).items():
             zf.writestr("sounds/" + name, data)
     return buffer.getvalue()
+
+
+# -- from the review of #32 ------------------------------------------------------------
+
+
+def test_damaged_files_are_only_ever_a_scheme_file_problem():
+    import random
+    rng = random.Random(32)
+    for name in ("tcp-good.tcpsounds", "tcp-hostile.tcpsounds", "tcp-duplicates.tcpsounds"):
+        original = (TESTDATA / name).read_bytes()
+        for _ in range(400):
+            data = bytearray(original)
+            for _ in range(rng.randint(1, 8)):
+                data[rng.randrange(len(data))] = rng.randrange(256)
+            try:
+                ss.read_scheme_file(bytes(data), TCP)
+            except ss.SchemeFileProblem:
+                pass
+
+
+def test_a_damaged_wav_is_a_problem_not_an_exception():
+    import random
+    rng = random.Random(14)
+    good = zipfile.ZipFile(TESTDATA / "tcp-good.tcpsounds").read("sounds/knock.wav")
+    for _ in range(2000):
+        data = bytearray(good[:200])
+        for _ in range(rng.randint(1, 6)):
+            data[rng.randrange(len(data))] = rng.randrange(256)
+        assert ss.wav_problem(bytes(data)) is None or isinstance(ss.wav_problem(bytes(data)), str)
+
+
+def test_only_plain_pcm_is_a_wav_every_app_plays():
+    good = bytearray(zipfile.ZipFile(TESTDATA / "tcp-good.tcpsounds").read("sounds/knock.wav"))
+    good[20:22] = (0xFFFE).to_bytes(2, "little")  # WAVE_FORMAT_EXTENSIBLE
+    assert "PCM" in ss.wav_problem(bytes(good))
+
+
+@pytest.mark.parametrize("name,ok", [
+    ("a.wav", True), ("a\x85.wav", False), ("a\x7f.wav", False), ("a\u202evaw.x.wav", False),
+    ("\U0001F600" * 48 + ".wav", True), ("\U0001F600" * 49 + ".wav", False), ("a\ud800.wav", False),
+])
+def test_file_names(name, ok):
+    assert ss.custom_name_ok(name) is ok
+
+
+def test_unpaired_surrogates_are_cleaned_and_never_crash():
+    assert ss.clean_line("Rain \ud800", 60) == "Rain"
+    assert ss.name_problem("Rain \ud800") is not None
+    assert ss.utf16_length("\ud800") == 1
+
+
+def test_a_written_file_is_the_same_bytes_on_every_system():
+    data = ss.write_scheme_file(ss.SchemeFile("thechatplace", "X", {}), TCP)
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        assert all(info.create_system == 0 for info in zf.infolist())
+
+
+def test_writing_pins_a_built_in_schemes_sounds_itself():
+    data = ss.write_scheme_file(ss.SchemeFile("thechatplace", "Wood", {}), TCP, built_in=True, scheme_pack="wood")
+    meta = json.loads(zipfile.ZipFile(io.BytesIO(data)).read("scheme.json"))
+    assert meta["events"]["ToolRan"] == "builtin:wood/tap"
+
+
+def test_files_used_and_sound_path(tmp_path):
+    stored = {"ToolRan": "custom:a.wav", "NeedsYou": "custom:a.wav", "TurnFailed": "custom:b.wav"}
+    assert ss.files_used(TCP, stored) == ["a.wav", "b.wav"]
+    assert ss.sound_path(ss.SoundRef("builtin", "tap"), None, tmp_path, tmp_path / "c") == tmp_path / "glass" / "tap.wav"
+    assert ss.sound_path(ss.SoundRef("builtin", "tap", "wood"), "softbell", tmp_path, tmp_path) == tmp_path / "wood" / "tap.wav"
+    assert ss.sound_path(ss.SoundRef("custom", "a.wav"), None, tmp_path, tmp_path / "c") == tmp_path / "c" / "a.wav"
+    assert ss.sound_path(ss.SoundRef("custom", "../a.wav"), None, tmp_path, tmp_path / "c") is None
+    assert ss.sound_path(ss.SILENT, None, tmp_path, tmp_path) is None
+
+
+def test_install_never_overwrites_or_writes_an_unsafe_name(tmp_path):
+    scheme = ss.SchemeFile("thechatplace", "X", {"ToolRan": "custom:a.wav", "NeedsYou": "custom:../b.wav"},
+                           sounds={"a.wav": b"new", "../b.wav": b"evil"})
+    (tmp_path / "a.wav").mkdir()  # a folder in the way
+    done = ss.install_sounds(scheme, tmp_path)
+    assert done.added == ["a 2.wav"] and done.events["ToolRan"] == "custom:a 2.wav"
+    assert not (tmp_path.parent / "b.wav").exists()
+    assert done.events["NeedsYou"] == "none"
