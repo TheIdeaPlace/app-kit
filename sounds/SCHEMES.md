@@ -18,9 +18,11 @@ and #32.
   events. `apps.json` lists them in the app's order, each with its **key**, its label and its
   default built-in sound. A key is 1 to 40 ASCII letters or digits, written PascalCase
   (`MessageSent`).
-- **Built-in sound:** one of the WAV files in this folder, by name (`arrived`), played in a
-  **pack**: `glass`, `softbell` or `wood`. Names say what happened, not which app it happened in. An
-  app ships the built-in sounds its events use by default, and no others.
+- **Built-in sound:** one of an app's own WAV files, by name (`arrived` in QuickMail, `reply` in
+  The Chat Place), played in a **pack**: `glass`, `softbell` or `wood`. Each app has its own set,
+  made for its own events, in the folder `apps.json` names for it (`soundsFolder`). One sound, one
+  meaning: no two events share a sound, and no app uses another app's (see `README.md`). An app
+  ships the built-in sounds its events use by default, and no others.
 - **Scheme:** a name, and a sound for each event.
   - Each pack is also a **built-in scheme**, with the pack's id (`glass`, "Glass").
   - A person can make **schemes of their own**, and the app gives each one an id.

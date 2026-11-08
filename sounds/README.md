@@ -27,7 +27,16 @@ Each file is a 44.1 kHz, 16-bit mono WAV, under one second, peaking at about -6 
 ones below, which sit under speech. Everything is
 generated, so there is nothing to license: the sounds are under this repo's license like the code.
 
-Names say what happened, not which app it happened in. Each app maps its own events to them.
+**One sound, one meaning, and each app has its own set.** Every sound is made for one event in one
+app. No two events share a sound, and no app uses another app's sounds for something else.
+The Chat Place's first set did exactly that, taking QuickMail's Filed (a message archived) for a
+conversation compacted, Matched (a rule fired) for a message from another session, and so on, and
+it was replaced. `apps.json` lists each app's events with its sound; a test fails if two events
+share one or two apps' sets overlap. A new event gets a new sound, never an existing one.
+
+### QuickMail's
+
+At the top of each style folder, where QuickMail has always copied them from.
 
 | Name | Meaning | Shape | In QuickMail |
 |---|---|---|---|
@@ -46,18 +55,27 @@ Names say what happened, not which app it happened in. Each app maps its own eve
 | `moved` | Something was moved | Two quick notes, a bigger step up | Message moved |
 | `matched` | A rule of yours fired | One bright note | Default for a rule |
 
-These are soft, for things that happen often or that you aren't looking at. They're first used by The
-Chat Place:
+### The Chat Place's
 
-| Name | Meaning | Shape | Peak | In The Chat Place |
-|---|---|---|---|---|
-| `tap` | Something is going on | One note, 70 ms | -15 dB | A tool ran |
-| `changed` | Something is going on, and it changed something | Two quick notes, rising | -13 dB | A file changed |
-| `pulse` | Still going | One low note, 120 ms | -18 dB | Still working, after a silence |
-| `elsewhere` | Something new came in somewhere else | `arrived`'s rise, lower | -10 dB | Another chat finished |
-| `stopped` | You ended something | One low note, damped | -8 dB | You stopped a turn |
+In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty sounds, one
+for each event. The rules, the families and every sound's notes are in TheIdeaPlace/AIChat's
+`dev-notes/sound-design.md`. In short, events in a family share a pattern:
 
-Rising means something went or came right; falling means something was lost or failed.
+| Family | Pattern | Its sounds |
+|---|---|---|
+| Work going on | Very short high ticks, or a low hum; soft | `tool`, `edit`, `working` |
+| Your message | Starts on D5 and leaps an octave | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `stop` |
+| Answers | Notes rising to an open fifth | `reply`, `otherreply` (lower, softer), `aside` |
+| Needs you | One note fast three times, then a leap up | `needsyou` |
+| Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
+| Housekeeping and other sessions | A chord settling an octave down; two knocks and an answer | `compacted`, `peer` |
+
+In every app, rising means something went or came right; falling means something was lost or
+failed; a repeated note means waiting, or wanting you.
+
+`python/tests/test_sound_design.py` compares every sound's notes with every other's, strictly
+between apps and normally within one, so no sound can be mistaken for another before anyone has
+to listen.
 
 ## Regenerating them
 

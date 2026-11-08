@@ -144,7 +144,7 @@ def main() -> None:
     files["tcp-good.tcpsounds"] = scheme_zip({
         "format": 1, "app": "thechatplace", "name": "Rain at Night", "author": "Test Author",
         "license": "CC0-1.0", "description": "Soft sounds.",
-        "events": {"ToolRan": "builtin:softbell/tap", "ReplyFinished": "BUILTIN:arrived",
+        "events": {"ToolRan": "builtin:softbell/tool", "ReplyFinished": "BUILTIN:reply",
                    "NeedsYou": "custom:knock.wav", "TurnFailed": "none"},
         "newerField": {"ignored": True}}, {"knock.wav": wav})
     files["qm-0869.qmsounds"] = scheme_zip({
@@ -194,7 +194,7 @@ def main() -> None:
     files["tcp-app-null.tcpsounds"] = scheme_zip({"format": 1, "app": None, "name": "Mail",
                                                   "events": {"NewMail": "builtin:arrived"}}, {})
     files["tcp-cases-and-trim.tcpsounds"] = scheme_zip(
-        meta("a" * 59 + " b", ToolRan="builtin:SoftBell/Tap", NeedsYou="None"), {})
+        meta("a" * 59 + " b", ToolRan="builtin:SoftBell/Tool", NeedsYou="None"), {})
     files["tcp-nan.tcpsounds"] = scheme_zip(
         b'{"format": 1, "app": "thechatplace", "name": "X", "author": NaN, "events": {}}', {})
     files["tcp-surrogate.tcpsounds"] = scheme_zip(
