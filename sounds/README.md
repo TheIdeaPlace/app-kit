@@ -82,6 +82,7 @@ These come from building and measuring QuickMail's sounds. Apply them unless you
 - A sound adds to an announcement or status text, and never replaces it.
 - Have one Mute command that silences everything, and let it cut off a sound already playing.
 - A sound the person chose to preview plays even when muted, and stops when they leave the screen.
+- In the list of events, Space plays the selected event's sound, so a person can arrow through and hear each one. Don't rely on a Preview button's access key alone: a Mac has none.
 - Let them use their own file, and copy it into the app's data so it survives the original moving and travels with settings.
 
 **Don't flood**
