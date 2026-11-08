@@ -57,25 +57,27 @@ At the top of each style folder, where QuickMail has always copied them from.
 
 ### The Chat Place's
 
-In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty sounds, one
-for each event. The rules, the families and every sound's notes are in TheIdeaPlace/AIChat's
+In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty-two sounds,
+one for each event. The rules, the families and every sound's notes are in TheIdeaPlace/AIChat's
 `dev-notes/sound-design.md`. In short, events in a family share a pattern:
 
 | Family | Pattern | Its sounds |
 |---|---|---|
-| Work going on | Very short high ticks, or a low hum; soft | `tool`, `edit`, `working` |
-| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth) | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop` |
+| Work going on | A very short high tick, or a low hum; soft | `tool`, `working` |
+| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth); an answer comes to rest on the note Needs you calls on | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop`, `answer` |
 | Answers | Notes rising to an open fifth | `reply`, `otherreply` (lower, softer), `aside` |
 | Needs you | One note fast three times, then a leap up | `needsyou` |
 | Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
-| Housekeeping and other sessions | A chord settling an octave down; two knocks and an answer | `compacted`, `peer` |
+| Housekeeping and other sessions | A chord settling down (an octave for a compacted conversation, a fourth, quieter, for a file written); two knocks and an answer | `compacted`, `write`, `peer` |
 
 In every app, rising means something went or came right; falling means something was lost or
 failed; a repeated note means waiting, or wanting you.
 
 `python/tests/test_sound_design.py` compares every sound's notes with every other's, strictly
 between apps and normally within one, so no sound can be mistaken for another before anyone has
-to listen.
+to listen. Within an app it also fails two sounds that are both soft and very short and start
+within a few semitones of each other, which blur together heard in passing whatever their notes:
+The Chat Place's first Tool ran and File changed sounds did.
 
 ## Regenerating them
 

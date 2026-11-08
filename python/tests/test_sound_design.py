@@ -4,7 +4,13 @@ sounds with other meanings; this keeps any app's set from coming close to anothe
 
 Two sounds count as the same gesture when they have the same number of notes (notes struck
 together count once), the same steps between notes within a tolerance in semitones, similar
-gaps, and start near each other. Between apps the tolerances are strict; within an app, normal."""
+gaps, and start near each other. Between apps the tolerances are strict; within an app, normal.
+
+That compares shapes, which you follow when you listen for them. Two sounds can differ in shape
+and still blur together when you aren't paying attention: The Chat Place's Tick and Double tick
+(C7 and G7 15 ms apart, A6 then C7 50 ms apart) were both a soft, high blip of about a tenth of a
+second, and passed. So within an app, two sounds that are both very short and both soft, and start
+within a few semitones of each other, count as too alike whatever their shape."""
 import importlib.util
 import itertools
 from pathlib import Path
@@ -21,6 +27,9 @@ spec.loader.exec_module(gen)
 RELATED = {frozenset({"thechatplace:reply", "thechatplace:otherreply"})}
 STRICT = {"step": 2, "gap": 0.06, "start": 12}
 NORMAL = {"step": 1, "gap": 0.04, "start": 7}
+#: Heard in passing: a sound this short (seconds, last note's start plus its ring) and this soft
+#: (peak level; PEAK is 0.5) is a blip, and two blips this close in register are one sound.
+BLIP = {"seconds": 0.2, "peak": 0.25, "start": 7}
 
 
 def shape(notes):
@@ -61,6 +70,43 @@ def test_no_two_sounds_in_an_app_are_alike(app):
     found = [(a, b) for (a, na), (b, nb) in itertools.combinations(sounds.items(), 2)
              if frozenset({a, b}) not in RELATED and alike(na, nb, NORMAL)]
     assert found == []
+
+
+def blip(notes, level):
+    """A sound's first pitch when it's a soft, very short blip, or None. ``level`` is its entry
+    in the app's soft levels (generate.py's TCP_SOFT), empty for a sound at the normal level."""
+    seconds = min(gen.MAX_SECONDS, max(start for _, start, _ in notes)
+                  + level.get("tail", gen.DEFAULT_TAIL))
+    if seconds <= BLIP["seconds"] and level.get("peak", gen.PEAK) <= BLIP["peak"]:
+        return shape(notes)[0][0]
+    return None
+
+
+def blips_alike(a, b):
+    return a is not None and b is not None and abs(a - b) <= BLIP["start"]
+
+
+@pytest.mark.parametrize("app", sorted(gen.SETS))
+def test_no_two_soft_blips_in_an_app_are_alike(app):
+    _sub, sounds, soft = gen.SETS[app]
+    pitch = {name: blip(notes, soft.get(name, {})) for name, notes in sounds.items()}
+    found = [(a, b) for a, b in itertools.combinations(sounds, 2)
+             if frozenset({f"{app}:{a}", f"{app}:{b}"}) not in RELATED
+             and blips_alike(pitch[a], pitch[b])]
+    assert found == []
+
+
+def test_the_blip_check_catches_tick_and_double_tick():
+    """The pair it was written for, as they were (both pass the shape check): it fails them."""
+    tick = blip([(96, 0.0, 0.8), (103, 0.015, 1.0)], {"peak": 0.16, "tail": 0.06})
+    double_tick = blip([(93, 0.0, 0.8), (96, 0.05, 1.0)], {"peak": 0.20, "tail": 0.07})
+    assert not alike([(96, 0.0, 0.8), (103, 0.015, 1.0)], [(93, 0.0, 0.8), (96, 0.05, 1.0)], NORMAL)
+    assert blips_alike(tick, double_tick)
+    # The hum is as short and soft, but four octaves down: not the same blip.
+    assert not blips_alike(tick, blip(gen.TCP_SOUNDS["working"], gen.TCP_SOFT["working"]))
+    # A soft sound with a longer ring, or a short one at the normal level, isn't a blip.
+    assert blip([(93, 0.0, 1.0)], {"peak": 0.20, "tail": 0.25}) is None
+    assert blip([(93, 0.0, 1.0)], {"tail": 0.1}) is None
 
 
 def test_the_check_catches_what_it_should():

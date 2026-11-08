@@ -21,8 +21,8 @@ def test_the_package_ships_the_same_apps_json_as_the_sounds_folder():
 
 def test_each_apps_events_keys_and_sounds():
     assert TCP.extension == ".tcpsounds" and QM.extension == ".qmsounds"
-    assert len(TCP.events) == 21 and len(QM.events) == 14
-    assert TCP.built_in_sounds[:3] == ("tool", "edit", "working")
+    assert len(TCP.events) == 22 and len(QM.events) == 14
+    assert TCP.built_in_sounds[:3] == ("tool", "write", "working")
     assert "removed" in QM.built_in_sounds and "removed" not in TCP.built_in_sounds
     for app in (TCP, QM):
         assert all(ss._KEY.match(k) for k in app.keys)
@@ -124,10 +124,10 @@ def test_stored_sounds(value, ref):
 
 def test_resolve_and_portable_pin_the_pack_a_sound_played_in():
     stored = {"ReplyFinished": "builtin:wood/reply", "ToolRan": "none", "NeedsYou": "builtin:send"}
-    assert str(ss.resolve(TCP, "FileChanged", stored, built_in=True)) == "builtin:edit"
+    assert str(ss.resolve(TCP, "FileChanged", stored, built_in=True)) == "builtin:write"
     assert str(ss.resolve(TCP, "FileChanged", stored, built_in=False)) == "none"
     out = ss.portable(TCP, stored, built_in=True, scheme_pack="softbell")
-    assert out["FileChanged"] == "builtin:softbell/edit"
+    assert out["FileChanged"] == "builtin:softbell/write"
     assert out["ReplyFinished"] == "builtin:wood/reply"
     assert out["NeedsYou"] == "builtin:softbell/send"
     assert out["ToolRan"] == "none"
