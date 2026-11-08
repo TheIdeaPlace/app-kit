@@ -59,7 +59,8 @@ SOUNDS = {
 }
 
 # The Chat Place's own set, by the rules in TheIdeaPlace/AIChat's dev-notes/sound-design.md.
-# Families: work going on (ticks, a hum), your message (two or three quick middle notes),
+# Families: work going on (ticks, a hum), your message (from D5: up an octave as it goes, down
+# an octave when you take it back),
 # answers (rising open fifths), needs you (one note fast three times, then a leap), something
 # went wrong (falling, a half-step bend, a waver), housekeeping (a chord settling) and another
 # session (a knock).
@@ -74,6 +75,8 @@ TCP_SOUNDS = {
     "steer": [(D5, 0.00, 0.75), (E5, 0.04, 0.8), (D6, 0.09, 1.0)],
     "steertaken": [(A5, 0.00, 0.8), (B5, 0.04, 0.85), (CS6, 0.08, 0.9), (D6, 0.12, 1.0)],
     "queuesent": [(D5, 0.00, 0.7), (D5, 0.10, 0.6), (D6, 0.16, 1.0)],
+    # The held note dropping an octave instead of leaping: the queued message taken back.
+    "queuedelete": [(D5, 0.00, 0.7), (D5, 0.10, 0.6), (D4, 0.16, 1.0)],
     "stop": [(C4, 0.00, 1.0), (F3, 0.05, 0.9)],
     # Answers
     "reply": [(G4, 0.00, 0.8), (D5, 0.09, 0.85), (G5, 0.18, 1.0)],
@@ -103,6 +106,7 @@ TCP_SOFT = {
     "otherreply": {"peak": 0.32},
     "steertaken": {"peak": 0.30, "tail": 0.25},
     "queuesent": {"peak": 0.40},
+    "queuedelete": {"peak": 0.35, "tail": 0.25},
     "stop": {"peak": 0.40, "tail": 0.18},
     "aside": {"peak": 0.35},
     "asidefailed": {"peak": 0.35},
