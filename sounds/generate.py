@@ -3,13 +3,15 @@
 
 Usage: generate.py <output folder>
 
-Writes <output>/<style>/<name>.wav for every style and sound name: 44.1 kHz, 16-bit, mono,
-under one second, peak-normalized so the sounds sit at an even level, apart from the few that
-are meant to sit under everything else (SOFT). Same input, same bytes.
+Writes QuickMail's set to <output>/<style>/<name>.wav and The Chat Place's to
+<output>/thechatplace/<style>/<name>.wav: 44.1 kHz, 16-bit, mono, under one second,
+peak-normalized so the sounds sit at an even level, apart from the ones meant to sit under
+everything else (SOFT). Same input, same bytes.
 
-Names say what happened rather than which app it happened in, so any app can map its own
-events to them. Each name has one melodic shape across all styles; a style only changes the
-timbre. Rising means something went or came right, falling means something was lost or failed.
+Each app has its own sounds, made for its own events: one sound, one meaning, never borrowed from
+another app (The Chat Place's first set did borrow QuickMail's, with other meanings, and was
+replaced). The Chat Place's rules are in TheIdeaPlace/AIChat's dev-notes/sound-design.md. Each
+sound has one melodic shape across all styles; a style only changes the timbre.
 """
 import math
 import struct
@@ -31,10 +33,13 @@ C4, D4, E4, G4, A4 = 60, 62, 64, 67, 69
 C5, D5, E5, G5, A5 = 72, 74, 76, 79, 81
 C6, E6 = 84, 88
 A3, C3 = 57, 48
+G3, CS4, EB4, F4, B4, B5, D6, A6 = 55, 61, 63, 65, 71, 83, 86, 93
 
 DEFAULT_TAIL = 0.35
 
 # (note, start seconds, gain). The shape of each sound; styles only change the timbre.
+# QuickMail's set, unchanged. It's also at the top of each style folder, where QuickMail has
+# always copied it from.
 SOUNDS = {
     "sent": [(G5, 0.00, 0.8), (C6, 0.09, 1.0)],
     "queued": [(E5, 0.00, 0.8), (E5, 0.20, 0.5)],
@@ -50,28 +55,68 @@ SOUNDS = {
     "filed": [(C5, 0.00, 0.9), (D5, 0.07, 0.9)],
     "moved": [(D5, 0.00, 0.9), (G5, 0.07, 1.0)],
     "matched": [(E6, 0.00, 1.0)],
-    "tap": [(A4, 0.00, 1.0)],
-    "changed": [(A4, 0.00, 0.8), (E5, 0.06, 1.0)],
-    "pulse": [(C4, 0.00, 1.0)],
-    "elsewhere": [(C4, 0.00, 0.8), (E4, 0.10, 0.85), (G4, 0.20, 1.0)],
-    "stopped": [(C4, 0.00, 1.0)],
+}
+
+# The Chat Place's own set, by the rules in TheIdeaPlace/AIChat's dev-notes/sound-design.md.
+# Families: work going on (ticks, a hum), your message (two or three quick middle notes),
+# answers (rising open fifths), needs you (one note fast three times, then a leap), something
+# went wrong (falling, a half-step bend, a waver), housekeeping (a chord settling) and another
+# session (a knock).
+TCP_SOUNDS = {
+    # Work going on
+    "tool": [(E6, 0.00, 1.0)],
+    "edit": [(E6, 0.00, 0.8), (A6, 0.05, 1.0)],
+    "working": [(C3, 0.00, 1.0)],
+    # Your message
+    "send": [(D5, 0.00, 0.75), (A5, 0.06, 1.0)],
+    "queue": [(D5, 0.00, 1.0), (D5, 0.12, 0.6), (D5, 0.24, 0.35)],
+    "steer": [(D5, 0.00, 0.75), (E5, 0.05, 0.85), (A5, 0.10, 1.0)],
+    "steertaken": [(A5, 0.00, 0.8), (D6, 0.07, 1.0)],
+    "queuesent": [(D5, 0.00, 0.7), (D5, 0.10, 0.6), (A5, 0.20, 1.0)],
+    "stop": [(C4, 0.00, 1.0)],
+    # Answers
+    "reply": [(G4, 0.00, 0.8), (D5, 0.09, 0.85), (G5, 0.18, 1.0)],
+    "otherreply": [(G3, 0.00, 0.8), (D4, 0.09, 0.85), (G4, 0.18, 1.0)],
+    "aside": [(B4, 0.00, 0.8), (E5, 0.10, 1.0)],
+    # Needs you
+    "needsyou": [(A5, 0.00, 0.85), (A5, 0.08, 0.85), (A5, 0.16, 0.85), (E6, 0.26, 1.0)],
+    # Something went wrong
+    "turnfailed": [(D5, 0.00, 1.0), (A4, 0.14, 0.95), (F4, 0.28, 0.95)],
+    "notsent": [(E4, 0.00, 1.0), (EB4, 0.12, 1.0)],
+    "asidefailed": [(B4, 0.00, 0.8), (F4, 0.10, 1.0)],
+    "trouble": [(D4, 0.00, 1.0), (CS4, 0.06, 1.0), (D4, 0.12, 1.0), (CS4, 0.18, 1.0)],
+    "warning": [(E6, 0.00, 1.0), (C6, 0.12, 0.9), (E6, 0.24, 1.0)],
+    # Housekeeping and other sessions
+    "compacted": [(C5, 0.00, 0.6), (E5, 0.00, 0.6), (G5, 0.00, 0.6), (C5, 0.16, 1.0)],
+    "peer": [(E5, 0.00, 1.0), (E5, 0.07, 0.7), (B5, 0.18, 1.0)],
 }
 
 # Sounds that happen often, or about something you aren't looking at, so they sit under speech
-# rather than at the level of the rest. tail is how long the last note rings, so a tap is over
+# rather than at the level of the rest. tail is how long the last note rings, so a tick is over
 # quickly. Everything else uses PEAK and DEFAULT_TAIL.
-SOFT = {
-    "tap": {"peak": 0.18, "tail": 0.07},
-    "changed": {"peak": 0.22, "tail": 0.07},
-    "pulse": {"peak": 0.12, "tail": 0.12},
-    "elsewhere": {"peak": 0.32},
-    "stopped": {"peak": 0.40, "tail": 0.18},
+SOFT = {}
+TCP_SOFT = {
+    "tool": {"peak": 0.16, "tail": 0.06},
+    "edit": {"peak": 0.20, "tail": 0.07},
+    "working": {"peak": 0.12, "tail": 0.12},
+    "otherreply": {"peak": 0.32},
+    "steertaken": {"peak": 0.30, "tail": 0.25},
+    "queuesent": {"peak": 0.40},
+    "stop": {"peak": 0.40, "tail": 0.18},
+    "aside": {"peak": 0.35},
+    "asidefailed": {"peak": 0.35},
+}
+
+#: Each app's set: (subfolder under the output, sounds, soft levels).
+SETS = {
+    "quickmail": ("", SOUNDS, SOFT),
+    "thechatplace": ("thechatplace", TCP_SOUNDS, TCP_SOFT),
 }
 
 
-def peak_of(name):
+def peak_of(name, app="quickmail"):
     """The level a sound is normalized to, which measure.py checks."""
-    return SOFT.get(name, {}).get("peak", PEAK)
+    return SETS[app][2].get(name, {}).get("peak", PEAK)
 
 
 def bell(freq, seconds):
@@ -136,17 +181,18 @@ def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     root = Path(sys.argv[1])
-    for style, voice in STYLES.items():
-        folder = root / style
-        folder.mkdir(parents=True, exist_ok=True)
-        for name, shape in SOUNDS.items():
-            soft = SOFT.get(name, {})
-            samples = render(shape, voice, peak_of(name), soft.get("tail", DEFAULT_TAIL))
-            with wave.open(str(folder / f"{name}.wav"), "wb") as w:
-                w.setnchannels(1)
-                w.setsampwidth(2)
-                w.setframerate(RATE)
-                w.writeframes(struct.pack(f"<{len(samples)}h", *samples))
+    for app, (sub, sounds, soft_levels) in SETS.items():
+        for style, voice in STYLES.items():
+            folder = root / sub / style if sub else root / style
+            folder.mkdir(parents=True, exist_ok=True)
+            for name, shape in sounds.items():
+                soft = soft_levels.get(name, {})
+                samples = render(shape, voice, peak_of(name, app), soft.get("tail", DEFAULT_TAIL))
+                with wave.open(str(folder / f"{name}.wav"), "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(RATE)
+                    w.writeframes(struct.pack(f"<{len(samples)}h", *samples))
 
 
 if __name__ == "__main__":

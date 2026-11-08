@@ -21,12 +21,32 @@ def test_the_package_ships_the_same_apps_json_as_the_sounds_folder():
 
 def test_each_apps_events_keys_and_sounds():
     assert TCP.extension == ".tcpsounds" and QM.extension == ".qmsounds"
-    assert len(TCP.events) == 15 and len(QM.events) == 14
-    assert TCP.built_in_sounds[:3] == ("tap", "changed", "pulse")
+    assert len(TCP.events) == 20 and len(QM.events) == 14
+    assert TCP.built_in_sounds[:3] == ("tool", "edit", "working")
     assert "removed" in QM.built_in_sounds and "removed" not in TCP.built_in_sounds
     for app in (TCP, QM):
         assert all(ss._KEY.match(k) for k in app.keys)
         assert len(set(app.keys)) == len(app.keys)
+
+
+def test_one_sound_one_meaning():
+    """Every event has a sound of its own, and no app borrows another app's sounds: the first
+    Chat Place set reused QuickMail's with other meanings (AIChat dev-notes/sound-design.md)."""
+    names = {}
+    for app in ss.apps().values():
+        sounds = [e.sound for e in app.events]
+        assert len(sounds) == len(set(sounds)), f"{app.name} gives two events one sound"
+        for sound in sounds:
+            assert names.setdefault(sound, app.id) == app.id, f"{sound} is in two apps' sets"
+
+
+@pytest.mark.parametrize("app_id", ["quickmail", "thechatplace"])
+def test_every_apps_sounds_are_generated(app_id):
+    raw = json.loads((TESTDATA.parent / "apps.json").read_text(encoding="utf-8"))["apps"][app_id]
+    folder = TESTDATA.parent / raw["soundsFolder"] if raw["soundsFolder"] else TESTDATA.parent
+    for pack in ss.PACKS:
+        for event in ss.catalog(app_id).events:
+            assert (folder / pack / f"{event.sound}.wav").is_file(), f"{pack}/{event.sound}"
 
 
 CASES = [(name, app, want) for name, apps in EXPECTED["schemes"].items() for app, want in apps.items()]
@@ -90,12 +110,12 @@ def test_only_the_first_100_events_are_read():
 
 
 @pytest.mark.parametrize("value,ref", [
-    ("none", "none"), ("NONE", "none"), ("builtin:tap", "builtin:tap"),
-    ("Builtin:SoftBell/Tap", "builtin:softbell/tap"), ("custom:a.wav", "custom:a.wav"),
-    ("builtin:removed", None), ("builtin:chrome/tap", None), ("custom:a.mp3", None),
+    ("none", "none"), ("NONE", "none"), ("builtin:tool", "builtin:tool"),
+    ("Builtin:SoftBell/Tool", "builtin:softbell/tool"), ("custom:a.wav", "custom:a.wav"),
+    ("builtin:removed", None), ("builtin:chrome/tool", None), ("custom:a.mp3", None),
     ("custom:a/b.wav", None), ("custom:COM1.wav", None), ("custom:LPT¹.wav", None),
     ("custom: a.wav", None), ("custom:a.wav.", None), ("custom:" + "a" * 97 + ".wav", None),
-    ("tap", None), (3, None), (None, None),
+    ("tool", None), (3, None), (None, None),
 ])
 def test_stored_sounds(value, ref):
     parsed = ss.parse_ref(value, TCP)
@@ -103,17 +123,17 @@ def test_stored_sounds(value, ref):
 
 
 def test_resolve_and_portable_pin_the_pack_a_sound_played_in():
-    stored = {"ReplyFinished": "builtin:wood/arrived", "ToolRan": "none", "NeedsYou": "builtin:sent"}
-    assert str(ss.resolve(TCP, "FileChanged", stored, built_in=True)) == "builtin:changed"
+    stored = {"ReplyFinished": "builtin:wood/reply", "ToolRan": "none", "NeedsYou": "builtin:send"}
+    assert str(ss.resolve(TCP, "FileChanged", stored, built_in=True)) == "builtin:edit"
     assert str(ss.resolve(TCP, "FileChanged", stored, built_in=False)) == "none"
     out = ss.portable(TCP, stored, built_in=True, scheme_pack="softbell")
-    assert out["FileChanged"] == "builtin:softbell/changed"
-    assert out["ReplyFinished"] == "builtin:wood/arrived"
-    assert out["NeedsYou"] == "builtin:softbell/sent"
+    assert out["FileChanged"] == "builtin:softbell/edit"
+    assert out["ReplyFinished"] == "builtin:wood/reply"
+    assert out["NeedsYou"] == "builtin:softbell/send"
     assert out["ToolRan"] == "none"
     assert list(out) == list(TCP.keys)
     own = ss.portable(TCP, stored, built_in=False, scheme_pack=None)
-    assert own["NeedsYou"] == "builtin:glass/sent" and own["FileChanged"] == "none"
+    assert own["NeedsYou"] == "builtin:glass/send" and own["FileChanged"] == "none"
 
 
 def test_writing_gives_the_same_bytes_and_reads_back(tmp_path):
@@ -121,7 +141,7 @@ def test_writing_gives_the_same_bytes_and_reads_back(tmp_path):
     knock = zipfile.ZipFile(wav).read("sounds/knock.wav")
     scheme = ss.SchemeFile("thechatplace", "Mine", {"ToolRan": "custom:knock.wav",
                                                     "NeedsYou": "custom:gone.wav",
-                                                    "ReplyFinished": "builtin:wood/arrived"},
+                                                    "ReplyFinished": "builtin:wood/reply"},
                            author="Me", description="Quiet.")
     first = ss.write_scheme_file(scheme, TCP, read_sound=lambda n: knock if n == "knock.wav" else None,
                                  built_in=False, scheme_pack=None)
@@ -145,7 +165,7 @@ def test_installing_numbers_a_clashing_name_and_reuses_the_same_bytes(tmp_path):
     assert first.added == ["knock 2.wav"] and first.events["NeedsYou"] == "custom:knock 2.wav"
     second = ss.install_sounds(scheme, tmp_path)
     assert second.added == [] and second.events["NeedsYou"] == "custom:knock 2.wav"
-    assert second.events["ToolRan"] == "builtin:softbell/tap"
+    assert second.events["ToolRan"] == "builtin:softbell/tool"
 
 
 def test_names():
@@ -255,14 +275,14 @@ def test_a_written_file_is_the_same_bytes_on_every_system():
 def test_writing_pins_a_built_in_schemes_sounds_itself():
     data = ss.write_scheme_file(ss.SchemeFile("thechatplace", "Wood", {}), TCP, built_in=True, scheme_pack="wood")
     meta = json.loads(zipfile.ZipFile(io.BytesIO(data)).read("scheme.json"))
-    assert meta["events"]["ToolRan"] == "builtin:wood/tap"
+    assert meta["events"]["ToolRan"] == "builtin:wood/tool"
 
 
 def test_files_used_and_sound_path(tmp_path):
     stored = {"ToolRan": "custom:a.wav", "NeedsYou": "custom:a.wav", "TurnFailed": "custom:b.wav"}
     assert ss.files_used(TCP, stored) == ["a.wav", "b.wav"]
-    assert ss.sound_path(ss.SoundRef("builtin", "tap"), None, tmp_path, tmp_path / "c") == tmp_path / "glass" / "tap.wav"
-    assert ss.sound_path(ss.SoundRef("builtin", "tap", "wood"), "softbell", tmp_path, tmp_path) == tmp_path / "wood" / "tap.wav"
+    assert ss.sound_path(ss.SoundRef("builtin", "tool"), None, tmp_path, tmp_path / "c") == tmp_path / "glass" / "tool.wav"
+    assert ss.sound_path(ss.SoundRef("builtin", "tool", "wood"), "softbell", tmp_path, tmp_path) == tmp_path / "wood" / "tool.wav"
     assert ss.sound_path(ss.SoundRef("custom", "a.wav"), None, tmp_path, tmp_path / "c") == tmp_path / "c" / "a.wav"
     assert ss.sound_path(ss.SoundRef("custom", "../a.wav"), None, tmp_path, tmp_path / "c") is None
     assert ss.sound_path(ss.SILENT, None, tmp_path, tmp_path) is None
