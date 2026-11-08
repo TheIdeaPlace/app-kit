@@ -26,6 +26,8 @@ and #32.
 - **Scheme:** a name, and a sound for each event.
   - Each pack is also a **built-in scheme**, with the pack's id (`glass`, "Glass").
   - A person can make **schemes of their own**, and the app gives each one an id.
+- **Scheme folder:** the folder on this computer that holds one scheme's own sound files (see
+  "Where sound files live").
 - **Sizes** are exact byte counts:
   - 5 MB is 5,242,880;
   - 80 MB is 83,886,080;
@@ -65,7 +67,7 @@ One event's sound is one of these strings:
 | `none` | Nothing. |
 | `builtin:<name>` | The built-in sound in the scheme's pack. In a scheme of your own, Glass. |
 | `builtin:<pack>/<name>` | The built-in sound in that pack, whatever the scheme. |
-| `custom:<file>` | A file in the app's own sounds folder. |
+| `custom:<file>` | A file in the scheme's own folder (below). |
 
 The prefix, the pack and the built-in name match whatever their case, and are kept in lowercase
 (`BUILTIN:SoftBell/Tap` becomes `builtin:softbell/tap`). A file name keeps its case. A value that
@@ -90,10 +92,41 @@ A **safe file name**:
 - **A scheme of your own** keeps every event. An event it doesn't keep plays nothing ("blank means
   silent"), so a new scheme starts silent and you add only the sounds you want.
 - **Reset** puts a built-in scheme back to how it ships. Only schemes of your own can be renamed or
-  deleted. Deleting a scheme keeps its sound files.
+  deleted. Deleting a scheme deletes its folder and every sound file in it, and the app says so
+  when it asks ("Delete the sound scheme X and its sound files?").
 - **A scheme's name** is trimmed, isn't empty, has no control characters, is at most 60 units long,
   and is unique ignoring case.
 - **A scheme id the app doesn't have** plays as Glass.
+
+### Where sound files live
+
+Each scheme keeps its own sound files in a folder of its own, inside the app's sounds folder:
+`<sounds folder>/<scheme folder>/<file>`. There's no shared folder of scheme sounds, and a scheme
+never falls back to another folder for a file it doesn't have. (The reason is in
+kellylford/QuickMail#948: with one shared folder, deleting a scheme couldn't safely delete its
+files, and two schemes couldn't each have a different file with the same name.)
+
+- **The folder's name** is the scheme's id, in lowercase, never its name, so renaming a scheme
+  doesn't move anything. A built-in scheme's folder is its pack id (`glass`). An app gives its own
+  schemes ids that are safe folder names: ASCII letters, digits and `-` only, at most 64
+  characters, and never a pack id. An id that isn't like that (a hand edit such as `user-..\x`, or
+  one from a newer app) has no folder, so its `custom:` sounds play as missing; it's never joined to
+  a path.
+- **`custom:<file>` stays a plain, safe file name**, resolved in the scheme's own folder. Nothing
+  stored, and nothing in a scheme file, names the folder, so the scheme file format doesn't change.
+- **A file a person picks for an event** is copied into the folder of the scheme they're changing,
+  a built-in scheme included. Each scheme lists, and can remove, only the files in its own folder.
+- **Deleting a scheme** deletes its folder. **Copying a scheme** copies its folder. **Renaming** a
+  scheme leaves its folder where it is.
+- **Importing a scheme file** chooses the new scheme's id first and puts its sounds straight into
+  that scheme's folder. If the import fails, whatever had already landed there is deleted.
+- **Exporting a scheme** reads its `custom:` files from its own folder only.
+- **Sounds outside schemes**, such as QuickMail's per-rule sounds, are each app's own business and
+  aren't kept in any scheme's folder.
+
+An app that kept scheme sounds in one shared folder before this (QuickMail up to 0.8.69) has to move
+them into their schemes' folders once; how it does that is up to the app. An app adopting scheme
+folders from its first release (The Chat Place) has no shared folder to move or fall back to.
 
 ### Sounds in a scheme file
 
@@ -138,7 +171,7 @@ Unknown fields are ignored when reading, so a newer app can add one without a ne
 - Every event is written in the app's order. A `builtin:<name>` with no pack is written with the
   pack it played in (`builtin:softbell/arrived`), so the scheme sounds the same wherever it's
   imported.
-- Each distinct custom file goes in once. A file that's missing, larger than 5 MB, or would take
+- Each distinct custom file goes in once, read from the scheme's own folder. A file that's missing, larger than 5 MB, or would take
   the whole file past 80 MB minus 64 KB is left out, and its events are written as `none`.
 - `scheme.json` comes first, indented by 2, with non-ASCII characters left as they are. Sounds
   follow in name order.
@@ -164,11 +197,13 @@ while reading, from the bytes actually read, never from what the archive says ab
 - **Events:** at most the first 100 are read. A key that isn't one of the app's events is skipped.
   A value that can't be used becomes `none`.
 - **Sounds:** each `custom:` file an event uses is taken from the ZIP, in the app's event order.
-  - It's **dropped** if it's missing from the ZIP and not already in the app's sounds folder, larger
+  - It's **dropped** if it's missing from the ZIP and not already in the scheme's own folder, larger
     than 5 MB, damaged, not a sound the scheme file may hold, or named the same, ignoring case, as an
     earlier file the scheme uses, whether or not that one was kept (Windows would treat the two as
     one file).
-  - A file that isn't in the ZIP but is already in the app's sounds folder is used as it is.
+  - A file that isn't in the ZIP but is already in the scheme's own folder is used as it is. Only
+    that scheme's folder is looked in, never the sounds folder or another scheme's. A new scheme's
+    folder starts empty, so this only happens when a gallery update replaces a scheme already here.
   - Every event that used a dropped file becomes `none`, and the person is told how many events
     that is: the **dropped** count. A value that couldn't be used in the first place isn't counted.
 - **Names:** text is cleaned (above): the name to 60 units, the author to 60, the licence to 40 and
@@ -176,7 +211,8 @@ while reading, from the bytes actually read, never from what the archive says ab
   and so on is added, and the name is cut to fit within 60.
 - **Result:** an imported scheme is always a new scheme of your own. Events the file doesn't list
   play nothing.
-- **Putting sounds in place:** a sound whose name is already taken by a different file, or by
+- **Putting sounds in place:** sounds go into the scheme's own folder. A sound whose name is
+  already taken there by a different file, or by
   anything that isn't a plain file, is added as `<name> 2.wav`, `<name> 3.wav` and so on, and the
   events that use it follow. A file is never overwritten.
 
