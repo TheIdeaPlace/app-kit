@@ -35,6 +35,7 @@
         { "key": "MessageSteered", "label": "Message steered into the turn", "sound": "steer" },
         { "key": "SteerTaken", "label": "Steered message taken", "sound": "steertaken" },
         { "key": "QueuedMessageSent", "label": "Queued message sent", "sound": "queuesent" },
+        { "key": "QueuedMessageDeleted", "label": "Queued message deleted", "sound": "queuedelete" },
         { "key": "TurnStopped", "label": "You stopped a turn", "sound": "stop" },
         { "key": "ReplyFinished", "label": "Reply finished", "sound": "reply" },
         { "key": "OtherChatFinished", "label": "Another chat finished", "sound": "otherreply" },

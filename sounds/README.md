@@ -64,7 +64,7 @@ for each event. The rules, the families and every sound's notes are in TheIdeaPl
 | Family | Pattern | Its sounds |
 |---|---|---|
 | Work going on | Very short high ticks, or a low hum; soft | `tool`, `edit`, `working` |
-| Your message | Starts on D5 and leaps an octave | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `stop` |
+| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth) | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop` |
 | Answers | Notes rising to an open fifth | `reply`, `otherreply` (lower, softer), `aside` |
 | Needs you | One note fast three times, then a leap up | `needsyou` |
 | Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
