@@ -64,14 +64,18 @@ for each event. The rules, the families and every sound's notes are in TheIdeaPl
 | Family | Pattern | Its sounds |
 |---|---|---|
 | Work going on | Very short high ticks, or a low hum; soft | `tool`, `edit`, `working` |
-| Your message | Two or three quick middle notes | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `stop` |
+| Your message | Starts on D5 and leaps an octave | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `stop` |
 | Answers | Notes rising to an open fifth | `reply`, `otherreply` (lower, softer), `aside` |
 | Needs you | One note fast three times, then a leap up | `needsyou` |
 | Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
-| Housekeeping and other sessions | A chord settling; a knock | `compacted`, `peer` |
+| Housekeeping and other sessions | A chord settling an octave down; two knocks and an answer | `compacted`, `peer` |
 
 In every app, rising means something went or came right; falling means something was lost or
 failed; a repeated note means waiting, or wanting you.
+
+`python/tests/test_sound_design.py` compares every sound's notes with every other's, strictly
+between apps and normally within one, so no sound can be mistaken for another before anyone has
+to listen.
 
 ## Regenerating them
 
