@@ -62,12 +62,11 @@ SOUNDS = {
 # Families: work going on (ticks, a hum), your message (from D5: up an octave as it goes, down
 # an octave when you take it back),
 # answers (rising open fifths), needs you (one note fast three times, then a leap), something
-# went wrong (falling, a half-step bend, a waver), housekeeping (a chord settling) and another
-# session (a knock).
+# went wrong (falling, a half-step bend, a waver), housekeeping (a chord settling: a conversation
+# compacted, a file written) and another session (a knock).
 TCP_SOUNDS = {
     # Work going on
     "tool": [(C7, 0.00, 0.8), (G7, 0.015, 1.0)],
-    "edit": [(A6, 0.00, 0.8), (C7, 0.05, 1.0)],
     "working": [(C3, 0.00, 1.0)],
     # Your message
     "send": [(D5, 0.00, 0.8), (D6, 0.05, 1.0)],
@@ -78,6 +77,9 @@ TCP_SOUNDS = {
     # The held note dropping an octave instead of leaping: the queued message taken back.
     "queuedelete": [(D5, 0.00, 0.7), (D5, 0.10, 0.6), (D4, 0.16, 1.0)],
     "stop": [(C4, 0.00, 1.0), (F3, 0.05, 0.9)],
+    # Your answer to what a chat was waiting on you for: the send's leap, then coming to rest on
+    # A5, the note Needs you calls on.
+    "answer": [(D5, 0.00, 0.8), (D6, 0.05, 1.0), (A5, 0.13, 0.85)],
     # Answers
     "reply": [(G4, 0.00, 0.8), (D5, 0.09, 0.85), (G5, 0.18, 1.0)],
     "otherreply": [(G3, 0.00, 0.8), (D4, 0.09, 0.85), (G4, 0.18, 1.0)],
@@ -92,6 +94,10 @@ TCP_SOUNDS = {
     "warning": [(E6, 0.00, 1.0), (C6, 0.12, 0.9), (E6, 0.24, 1.0)],
     # Housekeeping and other sessions
     "compacted": [(C5, 0.00, 0.6), (E5, 0.00, 0.6), (G5, 0.00, 0.6), (C4, 0.18, 1.0)],
+    # A file written: a smaller chord settling a fourth, quicker and quieter than compacted, and
+    # in the middle register, far below the tool tick. It replaced "edit", two high ticks that
+    # were too like the tool's to tell apart without listening for them.
+    "write": [(A5, 0.00, 0.8), (CS6, 0.00, 0.7), (E5, 0.07, 1.0)],
     "peer": [(B5, 0.00, 1.0), (B5, 0.06, 0.85), (E5, 0.18, 0.9)],
 }
 
@@ -101,7 +107,6 @@ TCP_SOUNDS = {
 SOFT = {}
 TCP_SOFT = {
     "tool": {"peak": 0.16, "tail": 0.06},
-    "edit": {"peak": 0.20, "tail": 0.07},
     "working": {"peak": 0.12, "tail": 0.12},
     "otherreply": {"peak": 0.32},
     "steertaken": {"peak": 0.30, "tail": 0.25},
@@ -109,6 +114,7 @@ TCP_SOFT = {
     "queuedelete": {"peak": 0.35, "tail": 0.25},
     "stop": {"peak": 0.40, "tail": 0.18},
     "aside": {"peak": 0.35},
+    "write": {"peak": 0.30, "tail": 0.22},
     "asidefailed": {"peak": 0.35},
 }
 

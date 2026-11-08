@@ -28,7 +28,7 @@
       "soundsFolder": "thechatplace",
       "events": [
         { "key": "ToolRan", "label": "Tool ran", "sound": "tool" },
-        { "key": "FileChanged", "label": "File changed", "sound": "edit" },
+        { "key": "FileChanged", "label": "File changed", "sound": "write" },
         { "key": "StillWorking", "label": "Still working", "sound": "working" },
         { "key": "MessageSent", "label": "Message sent", "sound": "send" },
         { "key": "MessageQueued", "label": "Message queued", "sound": "queue" },
@@ -41,6 +41,7 @@
         { "key": "OtherChatFinished", "label": "Another chat finished", "sound": "otherreply" },
         { "key": "AsideAnswered", "label": "Ask Aside answered", "sound": "aside" },
         { "key": "NeedsYou", "label": "Needs you", "sound": "needsyou" },
+        { "key": "AnswerSent", "label": "Answer sent", "sound": "answer" },
         { "key": "TurnFailed", "label": "Turn failed", "sound": "turnfailed" },
         { "key": "MessageNotSent", "label": "Message not sent", "sound": "notsent" },
         { "key": "AsideNotAnswered", "label": "Ask Aside not answered", "sound": "asidefailed" },
