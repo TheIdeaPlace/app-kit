@@ -109,6 +109,17 @@ def test_the_blip_check_catches_tick_and_double_tick():
     assert blip([(93, 0.0, 1.0)], {"tail": 0.1}) is None
 
 
+def test_a_reply_handed_on_is_related_to_the_reply_and_the_send_but_neither():
+    """An agent's reply handed on to the next agent (TheIdeaPlace/AIChat#248) starts as the
+    reply does and leaps on as the send does, so it's placed at once, but it must not be taken
+    for the reply that means the conversation is waiting for you."""
+    tcp = gen.TCP_SOUNDS
+    assert shape(tcp["handon"])[0][:2] == shape(tcp["reply"])[0][:2]
+    assert shape(tcp["handon"])[1][-1] == shape(tcp["send"])[1][0] == 12
+    for other in ("reply", "otherreply", "send", "queuesent", "answer"):
+        assert not alike(tcp["handon"], tcp[other], NORMAL), other
+
+
 def test_the_check_catches_what_it_should():
     """The first set's mistake: The Chat Place's tap was QuickMail's matched, an octave apart."""
     assert alike([(88, 0.0, 1.0)], [(81, 0.0, 1.0)], NORMAL)
