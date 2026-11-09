@@ -39,6 +39,7 @@
         { "key": "TurnStopped", "label": "You stopped a turn", "sound": "stop" },
         { "key": "ReplyFinished", "label": "Reply finished", "sound": "reply" },
         { "key": "OtherChatFinished", "label": "Another chat finished", "sound": "otherreply" },
+        { "key": "ReplyHandedOn", "label": "Agent reply handed on", "sound": "handon" },
         { "key": "AsideAnswered", "label": "Ask Aside answered", "sound": "aside" },
         { "key": "NeedsYou", "label": "Needs you", "sound": "needsyou" },
         { "key": "AnswerSent", "label": "Answer sent", "sound": "answer" },

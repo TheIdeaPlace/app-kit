@@ -83,6 +83,9 @@ TCP_SOUNDS = {
     # Answers
     "reply": [(G4, 0.00, 0.8), (D5, 0.09, 0.85), (G5, 0.18, 1.0)],
     "otherreply": [(G3, 0.00, 0.8), (D4, 0.09, 0.85), (G4, 0.18, 1.0)],
+    # An agent's reply handed on to the next agent, the conversation going on without you: the
+    # reply's rise starting, then the send's leap from D5 to D6 instead of coming to rest.
+    "handon": [(G4, 0.00, 0.8), (D5, 0.09, 0.85), (D6, 0.14, 1.0)],
     "aside": [(E5, 0.00, 0.9), (A4, 0.08, 0.8), (E5, 0.16, 1.0)],
     # Needs you
     "needsyou": [(A5, 0.00, 0.85), (A5, 0.08, 0.85), (A5, 0.16, 0.85), (E6, 0.26, 1.0)],
@@ -109,6 +112,7 @@ TCP_SOFT = {
     "tool": {"peak": 0.16, "tail": 0.06},
     "working": {"peak": 0.12, "tail": 0.12},
     "otherreply": {"peak": 0.32},
+    "handon": {"peak": 0.40},
     "steertaken": {"peak": 0.30, "tail": 0.25},
     "queuesent": {"peak": 0.40},
     "queuedelete": {"peak": 0.35, "tail": 0.25},
