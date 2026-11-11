@@ -52,3 +52,34 @@ together, merge, then tag `python-v<version>`. Apps move to the new tag on their
 ```
 python -m pytest python/tests
 ```
+
+## Test coverage
+
+The **Coverage** workflow runs every Monday at 13:00 UTC (or by hand: Actions, Coverage, Run
+workflow). It measures how much of `theideaplace_appkit` the tests run on Windows, macOS and Linux,
+lines and branches, with Python 3.12, and combines the three (#41). The tests themselves aren't
+measured. `tools/coverage_check.py` compares the result with `testing/coverage/baseline.json` and
+flags:
+
+- the whole package falling more than 1 point;
+- a file of 50 statements or more falling more than 5 points;
+- any file, a new one included, with 25 or more statements more that no test runs.
+
+A drop files an issue labelled `coverage-regression`, or comments on the one already open. When a
+new file is flagged, the report also names any file gone since the baseline, as the new one may
+only have moved. Each run's summary page shows the report, and its `coverage-report` download has
+`coverage.json` and the per-line HTML.
+
+The baseline changes only when it's accepted, so a slow slide is still caught. When a drop is
+expected (code moved, tests removed on purpose), or coverage rose and the bar should rise with it,
+download `coverage.json` from a run's `coverage-report` and accept it in a pull request, from this
+folder:
+
+```
+gh run download RUN_ID -n coverage-report -D cov
+python tools/coverage_check.py cov/coverage.json --accept --measured "main at SHA, DATE, run RUN_ID"
+```
+
+To measure locally: `pip install pytest-cov`, then, from this folder,
+`python -m pytest -q tests --cov --cov-report=term-missing` (`pyproject.toml` has the settings).
+One platform alone reads lower than the combined figure, because each skips the others' tests.

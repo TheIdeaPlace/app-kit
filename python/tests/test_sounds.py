@@ -178,7 +178,9 @@ def test_urgent_clears_a_tap_still_waiting():
 
 
 def test_urgent_cuts_off_a_long_sound_after_a_moment(monkeypatch):
-    monkeypatch.setattr(sounds, "URGENT_WAIT_SECONDS", 0.05)
+    # Long enough that "not cut off yet" still holds on a slow runner: at 0.05 the
+    # wait ran out first on macOS under coverage (#41).
+    monkeypatch.setattr(sounds, "URGENT_WAIT_SECONDS", 0.5)
     output = FakeOutput(hold=True)
     player = SoundPlayer(output)
     player.play("my long file")
