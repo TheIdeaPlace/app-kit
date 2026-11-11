@@ -3,3 +3,10 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+# Test coverage output (#41).
+.coverage
+.coverage.*
+coverage.json
+coverage-report.md
+coverage-html/
+htmlcov/
