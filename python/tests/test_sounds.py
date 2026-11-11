@@ -185,6 +185,7 @@ def test_urgent_cuts_off_a_long_sound_after_a_moment(monkeypatch):
     player = SoundPlayer(output)
     player.play("my long file")
     assert output.started.wait(2)
+    asked = time.monotonic()
     player.play("attention", priority=URGENT)
     time.sleep(0.01)
     assert output.cancelled == []
@@ -192,6 +193,9 @@ def test_urgent_cuts_off_a_long_sound_after_a_moment(monkeypatch):
     while not output.cancelled and time.monotonic() < end:
         time.sleep(0.002)
     assert output.cancelled == ["my long file"]
+    # It waited for URGENT_WAIT_SECONDS, not some shorter time; a slow runner
+    # only makes the gap longer.
+    assert time.monotonic() - asked >= 0.4
     output.release.set()
     settle(player)
     player.close()
