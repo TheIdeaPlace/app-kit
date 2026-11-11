@@ -24,3 +24,17 @@ theideaplace_appkit = ["apps.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Test coverage, for the weekly Coverage workflow (#41) and for `pytest --cov` by hand from this
+# folder. relative_files and [paths] let the Windows, macOS and Linux runs be combined into one
+# report. The package only: the tests aren't measured.
+[tool.coverage.run]
+source = ["theideaplace_appkit"]
+branch = true
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "theideaplace_appkit/",
+    "theideaplace_appkit\\",
+]

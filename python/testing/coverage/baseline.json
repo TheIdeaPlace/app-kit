@@ -1,0 +1,35 @@
+{
+ "measured": "coverage-weekly at 070621d (main at fcbf6cd and this change), 2026-11-11, run 43018178754",
+ "total": {
+  "statements": 1212,
+  "missing": 86,
+  "percent": 91.84
+ },
+ "files": {
+  "theideaplace_appkit/__init__.py": {
+   "statements": 1,
+   "missing": 0,
+   "percent": 100.0
+  },
+  "theideaplace_appkit/difftext.py": {
+   "statements": 127,
+   "missing": 0,
+   "percent": 100.0
+  },
+  "theideaplace_appkit/soundgallery.py": {
+   "statements": 253,
+   "missing": 13,
+   "percent": 93.62
+  },
+  "theideaplace_appkit/sounds.py": {
+   "statements": 414,
+   "missing": 55,
+   "percent": 84.18
+  },
+  "theideaplace_appkit/soundschemes.py": {
+   "statements": 417,
+   "missing": 18,
+   "percent": 95.74
+  }
+ }
+}
