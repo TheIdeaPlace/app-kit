@@ -16,8 +16,6 @@ on:
   schedule:
     - cron: '0 13 * * 1'   # Mondays, 13:00 UTC
   workflow_dispatch:
-  push:
-    branches: [coverage-weekly]   # TEMPORARY: trial runs; removed before merging
 
 permissions:
   contents: read
