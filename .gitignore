@@ -1,0 +1,23 @@
+# Node (relay)
+node_modules/
+.wrangler/
+.dev.vars
+*.log
+
+# Python (python/)
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code worktrees are machine-local scratch space
+.claude/worktrees/
