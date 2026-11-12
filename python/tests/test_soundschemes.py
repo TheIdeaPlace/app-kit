@@ -21,7 +21,7 @@ def test_the_package_ships_the_same_apps_json_as_the_sounds_folder():
 
 def test_each_apps_events_keys_and_sounds():
     assert TCP.extension == ".tcpsounds" and QM.extension == ".qmsounds"
-    assert len(TCP.events) == 23 and len(QM.events) == 14
+    assert len(TCP.events) == 23 and len(QM.events) == 15
     assert TCP.built_in_sounds[:3] == ("tool", "write", "working")
     assert "removed" in QM.built_in_sounds and "removed" not in TCP.built_in_sounds
     for app in (TCP, QM):

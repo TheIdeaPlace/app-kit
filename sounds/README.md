@@ -54,6 +54,7 @@ At the top of each style folder, where QuickMail has always copied them from.
 | `filed` | Something was put away | Two quick notes, a small step up | Message archived |
 | `moved` | Something was moved | Two quick notes, a bigger step up | Message moved |
 | `matched` | A rule of yours fired | One bright note | Default for a rule |
+| `edge` | Nowhere further to go | One soft, short middle note | Up or Home at the top of the message list, Down or End at the bottom |
 
 ### The Chat Place's
 

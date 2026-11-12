@@ -56,6 +56,9 @@ SOUNDS = {
     "filed": [(C5, 0.00, 0.9), (D5, 0.07, 0.9)],
     "moved": [(D5, 0.00, 0.9), (G5, 0.07, 1.0)],
     "matched": [(E6, 0.00, 1.0)],
+    # Up or Home at the top of a list, Down or End at the bottom: one soft, short middle note,
+    # the selection going nowhere. Heard often, so it is quiet and over quickly.
+    "edge": [(A4, 0.00, 1.0)],
 }
 
 # The Chat Place's own set, by the rules in TheIdeaPlace/AIChat's dev-notes/sound-design.md.
@@ -107,7 +110,9 @@ TCP_SOUNDS = {
 # Sounds that happen often, or about something you aren't looking at, so they sit under speech
 # rather than at the level of the rest. tail is how long the last note rings, so a tick is over
 # quickly. Everything else uses PEAK and DEFAULT_TAIL.
-SOFT = {}
+SOFT = {
+    "edge": {"peak": 0.30, "tail": 0.15},
+}
 TCP_SOFT = {
     "tool": {"peak": 0.16, "tail": 0.06},
     "working": {"peak": 0.12, "tail": 0.12},
