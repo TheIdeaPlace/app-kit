@@ -44,7 +44,7 @@ jobs:
     steps:
       # The same actions, Python and install as python.yml.
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install
@@ -73,7 +73,7 @@ jobs:
         working-directory: python
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - uses: actions/download-artifact@v8
