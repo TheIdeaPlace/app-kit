@@ -80,7 +80,9 @@ def store_in_kit_vault(app, key, vault=KIT_VAULT):
             result = subprocess.run(
                 [exe, "keyvault", "secret", "set", "--vault-name", vault, "-n", name, "--file", str(path),
                  "--encoding", "base64", "--tags", f"kit-item={item}", "-o", "none"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace")
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return False, f"couldn't store the key in the kit vault {vault} ({e}); run az login and add it with push-kit"
         finally:
             path.unlink(missing_ok=True)
     if result.returncode != 0:
@@ -129,6 +131,9 @@ def main():
     print(f"Set APPKIT_RELAY_KEY and APPKIT_RELAY_URL in {repo}.", flush=True)
     ok, message = store_in_kit_vault(app, key)
     print(message if ok else f"Warning: {message}.", flush=True)
+    if ok and args.rotate:
+        print(f"The key changed, so on each machine that builds {app} locally, run "
+              "sync-secrets.py pull-kit --force to replace its old copy.", flush=True)
 
     owner = repo.split("/")[0]
     if owner.lower() == "theideaplace":

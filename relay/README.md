@@ -57,7 +57,8 @@ Every step matters. In particular, if step 4 is skipped, the app's reports fail 
      `kit-file-appkit-relay-<id>-key`, because GitHub secrets can't be read back. `sync-secrets.py
      pull-kit` (kellylford/The-Idea-Place-Projects, `signing/`) restores it on any machine as
      `~/.signing-kit/appkit-relay-<id>.key`, where local builds look. This needs `az login`; without
-     it, the script warns and carries on.
+     it, the script warns and carries on. After `--rotate`, run `pull-kit --force` on each machine
+     that builds the app locally, since pull-kit otherwise keeps a local copy that differs.
 
    No other app's key changes, so copies already installed keep working.
 4. **Add the repo to the GitHub App** (a person has to do this). The script opens the page.
