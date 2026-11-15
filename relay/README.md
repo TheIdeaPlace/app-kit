@@ -52,7 +52,12 @@ Every step matters. In particular, if step 4 is skipped, the app's reports fail 
 3. **Give the app a key:** `python scripts/add-app.py <app id>`. The script:
    - generates a key for this app only, and stops if the app already has one;
    - stores it in the Worker as `APP_KEY_<ID>`, and in this repo as `RELAY_APP_KEY_<ID>` for the smoke test;
-   - puts `APPKIT_RELAY_KEY` and `APPKIT_RELAY_URL` in the app's repo.
+   - puts `APPKIT_RELAY_KEY` and `APPKIT_RELAY_URL` in the app's repo;
+   - keeps a copy in Kelly's signing kit vault (`theideaplace-kit`) as
+     `kit-file-appkit-relay-<id>-key`, because GitHub secrets can't be read back. `sync-secrets.py
+     pull-kit` (kellylford/The-Idea-Place-Projects, `signing/`) restores it on any machine as
+     `~/.signing-kit/appkit-relay-<id>.key`, where local builds look. This needs `az login`; without
+     it, the script warns and carries on.
 
    No other app's key changes, so copies already installed keep working.
 4. **Add the repo to the GitHub App** (a person has to do this). The script opens the page.
@@ -107,6 +112,7 @@ Cloudflare API token is set (see below). Until then, deploy from a PC.
   - In this repo: `RELAY_GITHUB_APP_ID`, `RELAY_GITHUB_PRIVATE_KEY`, `RELAY_APP_KEYS` and
     `RELAY_APP_KEY_<ID>`, plus the variable `CLOUDFLARE_ACCOUNT_ID`.
   - In each app's repo: `APPKIT_RELAY_KEY` and the variable `APPKIT_RELAY_URL`.
+  - In the signing kit vault, for apps added from 2026-11-15 on: `kit-file-appkit-relay-<id>-key`.
 - **Device flow is off.** It's for the planned "file under my own name" sign-in
   (TheIdeaPlace/app-kit#2). Turn it on in the App's settings when that's built.
 
