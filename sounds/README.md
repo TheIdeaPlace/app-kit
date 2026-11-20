@@ -56,7 +56,7 @@ At the top of each style folder, where QuickMail has always copied them from.
 | `matched` | A rule of yours fired | One bright note | Default for a rule |
 | `edge` | Nowhere further to go | One soft, short middle note | Up or Home at the top of the message list, Down or End at the bottom |
 | `suggest` | Something is on offer | Three quick soft notes, rising | Address suggestions appeared below a To, Cc, Bcc or Invite field |
-| `inserted` | The offer was taken | Two quick soft notes, from the top of `suggest` back down | An address from the suggestions went into the field |
+| `inserted` | The offer was taken | Three quick soft notes, falling from the top of `suggest` to the octave below its start | An address from the suggestions went into the field |
 
 ### The Chat Place's
 

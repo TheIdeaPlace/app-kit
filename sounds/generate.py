@@ -62,9 +62,9 @@ SOUNDS = {
     # The address suggestion list appearing below a To, Cc, Bcc or Invite field: a quick, light
     # rise, something on offer. Heard as you type, so it is soft and short.
     "suggest": [(G5, 0.00, 0.7), (B5, 0.04, 0.8), (D6, 0.08, 1.0)],
-    # An address from that list going into the field: from the top of the offer back down to
-    # where it began, the choice settling into place.
-    "inserted": [(D6, 0.00, 0.9), (G5, 0.06, 1.0)],
+    # An address from that list going into the field: from the top of the offer down past where
+    # it began, to the octave below, the choice settling into place.
+    "inserted": [(D6, 0.00, 0.8), (G5, 0.06, 0.9), (D5, 0.12, 1.0)],
 }
 
 # The Chat Place's own set, by the rules in TheIdeaPlace/AIChat's dev-notes/sound-design.md.
