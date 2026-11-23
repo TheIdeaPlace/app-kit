@@ -60,14 +60,14 @@ At the top of each style folder, where QuickMail has always copied them from.
 
 ### The Chat Place's
 
-In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty-three sounds,
+In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty-four sounds,
 one for each event. The rules, the families and every sound's notes are in TheIdeaPlace/AIChat's
 `dev-notes/sound-design.md`. In short, events in a family share a pattern:
 
 | Family | Pattern | Its sounds |
 |---|---|---|
 | Work going on | A very short high tick, or a low hum; soft | `tool`, `working` |
-| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth); an answer comes to rest on the note Needs you calls on | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop`, `answer` |
+| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth); an answer comes to rest on the note Needs you calls on; a suggested message rises only a fifth and steps back, put in your box but not going | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop`, `answer`, `suggested` (soft) |
 | Answers | Notes rising to an open fifth; an agent's reply handed on to the next agent starts the rise, then leaps an octave like a send | `reply`, `otherreply` (lower, softer), `handon` (softer), `aside` |
 | Needs you | One note fast three times, then a leap up | `needsyou` |
 | Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
