@@ -52,7 +52,8 @@
         { "key": "ServiceTrouble", "label": "Service trouble", "sound": "trouble" },
         { "key": "UsageWarning", "label": "Usage or context warning", "sound": "warning" },
         { "key": "Compacted", "label": "Conversation compacted", "sound": "compacted" },
-        { "key": "PeerMessage", "label": "Message from another session", "sound": "peer" }
+        { "key": "PeerMessage", "label": "Message from another session", "sound": "peer" },
+        { "key": "MessageSuggested", "label": "Message suggested", "sound": "suggested" }
       ]
     }
   }
