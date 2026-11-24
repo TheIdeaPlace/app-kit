@@ -35,7 +35,7 @@ C6, E6 = 84, 88
 A3, C3 = 57, 48
 G3, CS4, EB4, F4, B4, B5, D6, A6 = 55, 61, 63, 65, 71, 83, 86, 93
 GS4, C7, DS4, G7, CS6, F3, B3 = 68, 96, 63, 103, 85, 53, 59
-FS5 = 78
+FS5, FS6 = 78, 90
 
 DEFAULT_TAIL = 0.35
 
@@ -87,10 +87,15 @@ TCP_SOUNDS = {
     # The held note dropping an octave instead of leaping: the queued message taken back.
     "queuedelete": [(D5, 0.00, 0.7), (D5, 0.10, 0.6), (D4, 0.16, 1.0)],
     "stop": [(C4, 0.00, 1.0), (F3, 0.05, 0.9)],
-    # A message suggested and put in your message box, not sent (AIChat #474): the send's start
-    # on D5, rising only a fifth to A5 instead of the octave, then stepping back down to F#5 to
-    # rest there: offered, waiting for you, not going. Soft: it follows a reply's sound.
-    "suggested": [(D5, 0.00, 0.75), (A5, 0.06, 0.9), (FS5, 0.14, 1.0)],
+    # A prompt suggested and put in your message box, not sent (AIChat #474): two light high taps,
+    # F#6, with A5 between, "ding-ding". High and quick, so it stands apart from the replies'
+    # rising fifths it follows. It replaced a soft D5, A5, F#5 that Kelly found too easy to miss
+    # (2026-11-24); he chose this from three candidates in all three styles.
+    "suggested": [(FS6, 0.00, 0.9), (A5, 0.09, 0.8), (FS6, 0.18, 1.0)],
+    # Up or Home at the top of a list, Down or End at the bottom (AIChat #714): QuickMail's edge,
+    # note for note, because it's the same event in both apps (Kelly, 2026-11-24). The design
+    # test lets these two match (SHARED there).
+    "edge": [(A4, 0.00, 1.0)],
     # Your answer to what a chat was waiting on you for: the send's leap, then coming to rest on
     # A5, the note Needs you calls on.
     "answer": [(D5, 0.00, 0.8), (D6, 0.05, 1.0), (A5, 0.13, 0.85)],
@@ -135,7 +140,8 @@ TCP_SOFT = {
     "queuesent": {"peak": 0.40},
     "queuedelete": {"peak": 0.35, "tail": 0.25},
     "stop": {"peak": 0.40, "tail": 0.18},
-    "suggested": {"peak": 0.32, "tail": 0.25},
+    "suggested": {"peak": 0.42, "tail": 0.30},
+    "edge": {"peak": 0.30, "tail": 0.15},
     "aside": {"peak": 0.35},
     "write": {"peak": 0.30, "tail": 0.22},
     "asidefailed": {"peak": 0.35},

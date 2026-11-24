@@ -53,7 +53,8 @@
         { "key": "UsageWarning", "label": "Usage or context warning", "sound": "warning" },
         { "key": "Compacted", "label": "Conversation compacted", "sound": "compacted" },
         { "key": "PeerMessage", "label": "Message from another session", "sound": "peer" },
-        { "key": "MessageSuggested", "label": "Message suggested", "sound": "suggested" }
+        { "key": "PromptSuggested", "label": "Prompt suggested", "sound": "suggested" },
+        { "key": "ListEnd", "label": "Reached the end of a list", "sound": "edge" }
       ]
     }
   }

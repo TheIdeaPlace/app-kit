@@ -60,18 +60,18 @@ At the top of each style folder, where QuickMail has always copied them from.
 
 ### The Chat Place's
 
-In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty-four sounds,
+In `thechatplace/glass/`, `thechatplace/softbell/` and `thechatplace/wood/`: twenty-five sounds,
 one for each event. The rules, the families and every sound's notes are in TheIdeaPlace/AIChat's
 `dev-notes/sound-design.md`. In short, events in a family share a pattern:
 
 | Family | Pattern | Its sounds |
 |---|---|---|
 | Work going on | A very short high tick, or a low hum; soft | `tool`, `working` |
-| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth); an answer comes to rest on the note Needs you calls on; a suggested message rises only a fifth and steps back, put in your box but not going | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop`, `answer`, `suggested` (soft) |
+| Your message | From D5, leaping an octave as it goes; dropping when you take it back (Withdraw an octave, Stop a low fourth); an answer comes to rest on the note Needs you calls on; a suggested prompt is two light high taps | `send`, `queue`, `steer`, `steertaken`, `queuesent`, `queuedelete`, `stop`, `answer`, `suggested` |
 | Answers | Notes rising to an open fifth; an agent's reply handed on to the next agent starts the rise, then leaps an octave like a send | `reply`, `otherreply` (lower, softer), `handon` (softer), `aside` |
 | Needs you | One note fast three times, then a leap up | `needsyou` |
 | Something went wrong | Falling, a half-step bend, or a waver | `turnfailed`, `notsent`, `asidefailed`, `trouble`, `warning` |
-| Housekeeping and other sessions | A chord settling down (an octave for a compacted conversation, a fourth, quieter, for a file written); two knocks and an answer | `compacted`, `write`, `peer` |
+| Housekeeping and other sessions | A chord settling down (an octave for a compacted conversation, a fourth, quieter, for a file written); two knocks and an answer; at the end of a list, QuickMail's own edge, shared because it's the same event | `compacted`, `write`, `peer`, `edge` (soft) |
 
 In every app, rising means something went or came right; falling means something was lost or
 failed; a repeated note means waiting, or wanting you.
@@ -94,6 +94,20 @@ shows up in the diff only where a sound really changed. `measure.py` checks form
 clicks at the start and end, which matters because the sounds are written by code and an AI can't hear
 them. It caught a style whose every sound began with a click. It can't tell you whether a sound is
 pleasant, so a change still needs a person to listen.
+
+## Adding or changing a sound
+
+Every sound's design is written down when it's made or changed, in the same pull request:
+
+- **Here:** a comment beside its notes in `generate.py` saying what it means and why it has that
+  shape, and its row in this README's table for its app.
+- **In the app:** The Chat Place's `dev-notes/sound-design.md` (TheIdeaPlace/AIChat) gets the
+  event's row, with its family, notes, level and anything it was changed to avoid. QuickMail's sounds
+  are described in its own table above.
+- **Anything a design test made you change.** If `python/tests/test_sound_design.py` found it too
+  alike another sound, say which, so the next change doesn't walk back into it.
+- **A person hears it first:** give Kelly candidates in all three styles before one is chosen.
+- **The voiced schemes** in TheIdeaPlace/soundgallery (the public gallery) need the new event's clip.
 
 ## How an app should use sounds
 
