@@ -21,7 +21,7 @@ def test_the_package_ships_the_same_apps_json_as_the_sounds_folder():
 
 def test_each_apps_events_keys_and_sounds():
     assert TCP.extension == ".tcpsounds" and QM.extension == ".qmsounds"
-    assert len(TCP.events) == 24 and len(QM.events) == 17
+    assert len(TCP.events) == 25 and len(QM.events) == 17
     assert TCP.built_in_sounds[:3] == ("tool", "write", "working")
     assert "removed" in QM.built_in_sounds and "removed" not in TCP.built_in_sounds
     for app in (TCP, QM):
@@ -29,15 +29,24 @@ def test_each_apps_events_keys_and_sounds():
         assert len(set(app.keys)) == len(app.keys)
 
 
+#: A sound two apps share because it's the same event in both, with the same key, and Kelly
+#: agreed: reaching the end of a list (QuickMail #923, AIChat #714).
+SHARED = {"edge": "ListEnd"}
+
+
 def test_one_sound_one_meaning():
     """Every event has a sound of its own, and no app borrows another app's sounds: the first
-    Chat Place set reused QuickMail's with other meanings (AIChat dev-notes/sound-design.md)."""
+    Chat Place set reused QuickMail's with other meanings (AIChat dev-notes/sound-design.md).
+    The one exception is SHARED, where the event, not just the sound, is the same."""
     names = {}
     for app in ss.apps().values():
         sounds = [e.sound for e in app.events]
         assert len(sounds) == len(set(sounds)), f"{app.name} gives two events one sound"
-        for sound in sounds:
-            assert names.setdefault(sound, app.id) == app.id, f"{sound} is in two apps' sets"
+        for event in app.events:
+            if SHARED.get(event.sound) == event.key:
+                continue
+            assert names.setdefault(event.sound, app.id) == app.id, \
+                f"{event.sound} is in two apps' sets"
 
 
 @pytest.mark.parametrize("app_id", ["quickmail", "thechatplace"])

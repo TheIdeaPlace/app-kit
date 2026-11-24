@@ -25,6 +25,10 @@ spec.loader.exec_module(gen)
 #: Pairs meant to sound related (dev-notes/sound-design.md, rule 4): another chat's reply is the
 #: reply's rise an octave lower and softer.
 RELATED = {frozenset({"thechatplace:reply", "thechatplace:otherreply"})}
+#: Sounds two apps share on purpose, note for note, because the event means exactly the same in
+#: both and Kelly agreed (the rule's one exception). Reaching the end of a list: QuickMail #923,
+#: AIChat #714.
+SHARED = {frozenset({"quickmail:edge", "thechatplace:edge"})}
 STRICT = {"step": 2, "gap": 0.06, "start": 12}
 NORMAL = {"step": 1, "gap": 0.04, "start": 7}
 #: Heard in passing: a sound this short (seconds, last note's start plus its ring) and this soft
@@ -60,7 +64,8 @@ def all_sounds():
 
 def test_no_sound_is_like_another_apps():
     found = [(a, b) for (a, na), (b, nb) in itertools.combinations(all_sounds().items(), 2)
-             if a.split(":")[0] != b.split(":")[0] and alike(na, nb, STRICT)]
+             if a.split(":")[0] != b.split(":")[0] and alike(na, nb, STRICT)
+             and frozenset({a, b}) not in SHARED]
     assert found == []
 
 
